@@ -1,3 +1,9 @@
+/*
+*Name: arm.h
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #ifndef ARM_H
 #define ARM_H
 
@@ -30,9 +36,9 @@
 #define SCTLR_AFE       (1 << 29)
 #define SCTLR_TE        (1 << 30)     
 
-#define allign_mask(a) ((1<<a)-1)
-#define allign_up(x, a) ((x+((1<<a)-1))&(~((1<<a)-1)))
-#define allign_down(x, a) (x&(~((1<<a)-1)))
+#define allign_mask(a) ((1<<(a))-1)
+#define allign_up(x, a) (((x)+((1<<(a))-1))&(~((1<<(a))-1)))
+#define allign_down(x, a) ((x)&(~((1<<(a))-1)))
 
 #define PAGE_SHIFT 12
 #define SECTION_SHIFT 20

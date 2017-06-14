@@ -1,3 +1,9 @@
+/*
+*Name: main.c
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #include "uart.h"
 #include "type.h"
 #include "arm.h"
@@ -29,7 +35,8 @@
 	addr_t g_pt2_addr##num[1024] __attribute__((aligned(1024)));
 
 #define rdbg(fmt, args...) printf("[RANK][DEBUG]"fmt, ##args)
- 
+#define rerr(fmt, args...) printf("[RANK][ERROR]"fmt, ##args)
+
 typedef struct
 {
 	addr_t ebss;
@@ -42,14 +49,15 @@ boot_param_t g_boot_param;
 uint8_t g_pt2_map[2];
 uint32_t sp_idle[1024];
 
+#define ARRAY_NUM 2 //two blocks are enough
 DECALRE_PT2_ARRAY(0)
 DECALRE_PT2_ARRAY(1)
 
 extern addr_t g_pt1_addr;
+extern size_t g_v2p_off;
 
 extern void printf(const char *fmt, ...);
 extern void print_init(uint32_t base);
-
 
 int raise(int signo)
 {
@@ -62,28 +70,31 @@ addr_t alloc_pt2_low(int blocks)
 
 	addr_t pt2_addr = 0;
 
-	if(blocks == 1)
+	//only support one block now.
+	if(blocks != 1)
 	{
-		for(i = 0; i < 2; i++)
+		return 0;
+	}
+
+	for(i = 0; i < ARRAY_NUM; i++)
+	{
+		if(g_pt2_map[i] == 0)
 		{
-			if(g_pt2_map[i] == 0)
-			{
-				break;
-			}
+			break;
 		}
-		if(i < 2)
+	}
+	if(i < ARRAY_NUM)
+	{
+		switch(i)
 		{
-			switch(i)
-			{
-				case 0:
-				pt2_addr = (addr_t)g_pt2_addr0;
-				break;
-				case 1:
-				pt2_addr = (addr_t)g_pt2_addr1;
-				break;	
-				default:
-				break;
-			}
+			case 0:
+			pt2_addr = (addr_t)g_pt2_addr0;
+			break;
+			case 1:
+			pt2_addr = (addr_t)g_pt2_addr1;
+			break;	
+			default:
+			break;
 		}
 	}
 
@@ -119,6 +130,12 @@ int do_linear_map(void)
 
 	ret = do_mmu_map(vaddr, paddr, LINEAR_MEM_SIZE, flag, alloc_pt2_low);
 
+#if 1 //test if liner map success, if needed, can enable.
+	*(uint32_t *)vaddr = 0;
+	*(uint32_t *)(vaddr+SECTION_SIZE) = 0;
+	*(uint32_t *)(vaddr+LINEAR_MEM_SIZE-4) = 0;
+#endif
+	
 	return ret;
 }
 
@@ -127,6 +144,7 @@ int mm_init(void)
 	int ret;
 
 	g_pt1_addr = g_boot_param.pt1_addr;
+	g_v2p_off = g_boot_param.loffset;
 
 	ret = do_io_map();
 	if(ret < 0)
@@ -147,6 +165,9 @@ int mm_init(void)
 	return ret;
 }
 
+/*
+* Main function.
+*/
 int rank_main(void)
 {
 	uart_init(UART0_BASE_PADDR, UART_CLK, 115200);
@@ -157,7 +178,7 @@ int rank_main(void)
 
 	rdbg("mm init...\n");
 
-	rdbg("boot params: ebss= %x, pt1_addr = %x, loffset = %x\n", \
+	rdbg("boot params: ebss= 0x%x, pt1_addr = 0x%x, loffset = 0x%x\n", \
 		g_boot_param.ebss, g_boot_param.pt1_addr, g_boot_param.loffset);
 	
 	if(mm_init() == -1)

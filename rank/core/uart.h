@@ -1,3 +1,9 @@
+/*
+*Name: uart.h
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #ifndef UART_H
 #define UART_H
 
@@ -5,7 +11,6 @@
 
 #define UART0_BASE_PADDR    0x3f201000
 #define UART0_BASE_VADDR    0xff201000
-#define CONSOLE_BASE UART0_BASE_VADDR
 #define UART_CLK 48000000
 
 #define UART_DR		0x00 /* data register */

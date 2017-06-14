@@ -1,3 +1,9 @@
+/*
+*Name: print.c
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #include "uart.h"
 
 #define va_start(v,l)   __builtin_va_start(v,l)
@@ -164,9 +170,7 @@ void printf(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-		
 	vprintf(fmt, ap);
-	
 	va_end(ap);
 }
 

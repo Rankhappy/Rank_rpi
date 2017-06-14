@@ -1,3 +1,9 @@
+/*
+*Name: mmu.c
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #include "type.h"
 #include "arm.h"
 #include "uart.h"
@@ -8,8 +14,10 @@
 #define PT2_FIXED_FLAG ((1 << 1)|(1 << 4))
 
 #define mdbg(fmt, args...) printf("[RANK][MMU][DEBUG]"fmt, ##args)
+#define merr(fmt, args...) printf("[RANK][MMU][ERROR]"fmt, ##args)
 
 addr_t g_pt1_addr;
+size_t g_v2p_off;
 extern void printf(const char *fmt, ...);
 
 static int do_section_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mflag)
@@ -30,8 +38,6 @@ static int do_section_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mf
 	
 	pt1_entry += l1_offset;
 
-	mdbg("do_section_map:pt1_entry = %x, flag = %x\n", pt1_entry, flag);
-
 	while(size)
 	{
 		if((*pt1_entry & 0x03) != 0)
@@ -40,11 +46,11 @@ static int do_section_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mf
 			{
 				return 0;
 			}
-			mdbg("do_section_map:%x != %x\n", *pt1_entry, paddr|flag);
+			merr("do_section_map:0x%x != 0x%x\n", *pt1_entry, paddr|flag);
 			return -1;
 		}
 		*pt1_entry = paddr | flag;
-		mdbg("do_section_map::*pt1_entry = %x\n", *pt1_entry);
+		mdbg("do_section_map:pt1_entry = 0x%x, *pt1_entry = 0x%x\n", pt1_entry, *pt1_entry);
 		pt1_entry++;
 		vaddr += SECTION_SIZE;
 		paddr += SECTION_SIZE;
@@ -60,7 +66,8 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 	unsigned char ov;
 
 	addr_t pt2_addr;
-	int nsections = size>>SECTION_SHIFT+1;
+	int nsections = (allign_up(vaddr+size, SECTION_SHIFT) - \
+						allign_down(vaddr, SECTION_SHIFT)) >> SECTION_SHIFT;
 	uint32_t l1_offset = vaddr >> SECTION_SHIFT;
 	uint32_t *pt1_entry = (uint32_t *)g_pt1_addr;
 	uint32_t flag1 = PT1_FIXED_FLAG_T;
@@ -72,15 +79,13 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 	{
 		flag2 |= (3 << 2);
 	}
-	flag2 |= mflag.shareble << 16;
+	flag2 |= mflag.shareble << 10;
 	flag2 |= mflag.ng << 11;
 	flag2 |= (mflag.ap&0x01) << 5;
 	flag2 |= (mflag.ap&0x02) << 8;
 	flag1 |= mflag.ns << 3;
 
 	pt1_entry += l1_offset;
-
-	mdbg("do_coarse_map:pt1_entry = %x, flag = %x\n", pt1_entry, flag1);
 
 	for(i = 0; i < nsections; i++)
 	{
@@ -92,15 +97,16 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 				mdbg("do_coarse_map:pt2_addr == 0\n");
 				return -1;
 			}
-			*pt1_entry = pt2_addr | flag1;
+			*pt1_entry = vir2phy(pt2_addr, g_v2p_off) | flag1;
+			mdbg("do_coarse_map:pt1_entry = 0x%x, *pt1_entry = 0x%x\n", pt1_entry, *pt1_entry);
 		}
 		else
 		{	if(flag1 != (*pt1_entry&PAGE_MASK))
 			{
-				mdbg("do_coarse_map:@1 %x != %x\n", flag1, *pt1_entry&PAGE_MASK);
+				merr("do_coarse_map:@1 0x%x != 0x%x\n", flag1, *pt1_entry&PAGE_MASK);
 				return -1;
 			}
-			pt2_addr = (*pt1_entry)&(~PAGE_MASK);
+			pt2_addr = (*pt1_entry)&(~PAGE_MASK); //maybe leve2 pagetale already exist, we can reuse it, if flag is right.
 		}
 		pt1_entry++;
 		
@@ -109,9 +115,7 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 		pt2_entry += l2_offset;
 		ov = l2_offset;
 
-		mdbg("do_coarse_map:pt2_entry = %x, flag = %x\n", pt1_entry, flag2);
-
-		while(size && (++ov))
+		while(size && (++ov)) //ov means over the section.
 		{
 			if((*pt2_entry & 0x03) != 0)
 			{
@@ -119,10 +123,11 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 				{
 					return 0;
 				}
-				mdbg("do_coarse_map:@2 %x != %x\n", *pt2_entry, paddr|flag2);
+				merr("do_coarse_map:@2 0x%x != 0x%x\n", *pt2_entry, paddr|flag2);
 				return -1;
 			}
 			*pt2_entry = paddr | flag2;
+			mdbg("do_coarse_map:pt2_entry = 0x%x, *pt2_entry = 0x%x\n", pt2_entry, *pt2_entry);
 			pt2_entry++;
 			vaddr += PAGE_SIZE;
 			paddr += PAGE_SIZE;
@@ -133,6 +138,11 @@ static int do_coarse_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mfl
 	return 0;
 }
 
+/*
+*memory map, section map at first, then coarse table map.
+*only support section and short page,
+*dose not support super section and large page.
+*/
 int do_mmu_map(addr_t vaddr, addr_t paddr, size_t size, mmu_flag_t mflag, alloc_pt2_t alloc_pt2)
 {
 	vaddr = allign_down(vaddr, PAGE_SHIFT);
@@ -152,10 +162,11 @@ loop:
 		return 0;
 	}
 
-	mdbg("do_mmu_map:vaddr = %x, paddr = %x, size = %x\n", vaddr, paddr, size);
+	mdbg("do_mmu_map:vaddr = 0x%x, paddr = 0x%x, size = 0x%x\n", vaddr, paddr, size);
 	
 	if(((vaddr&SECTION_MASK) != (paddr&SECTION_MASK)) || (size < SECTION_SIZE))
 	{
+		/*can not do section map for this case.*/
 		ret = do_coarse_map(vaddr, paddr, size, mflag , alloc_pt2);
 		if(ret < 0)
 		{
@@ -165,7 +176,6 @@ loop:
 	else if((vaddr&SECTION_MASK) == 0)
 	{
 		size_t s_size = size & (~SECTION_MASK);
-
 		ret = do_section_map(vaddr, paddr, s_size, mflag);
 		if(ret < 0)
 		{
@@ -174,12 +184,11 @@ loop:
 		vaddr += s_size;
 		paddr += s_size;
 		size &= SECTION_MASK;
-		goto loop;
+		goto loop; //iterator
 	}
 	else
 	{
 		size_t p_size = SECTION_SIZE - (vaddr&SECTION_MASK);
-		
 		ret = do_coarse_map(vaddr, paddr, p_size, mflag, alloc_pt2);
 		if(ret < 0)
 		{
@@ -188,7 +197,7 @@ loop:
 		vaddr += p_size;
 		paddr += p_size;
 		size -= p_size;
-		goto loop;
+		goto loop; //iterator
 	}
 
 	return ret;

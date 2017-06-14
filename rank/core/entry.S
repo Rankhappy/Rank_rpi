@@ -1,3 +1,13 @@
+/*
+*Name: entry.S
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
+/*
+*for 32bits on armv8 architecture.
+*/
+
 #include "arm.h"
 
 .extern sp_test

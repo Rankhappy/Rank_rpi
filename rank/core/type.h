@@ -1,3 +1,9 @@
+/*
+*Name: type.c
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #ifndef TYPE_H
 #define TYPE_H
 

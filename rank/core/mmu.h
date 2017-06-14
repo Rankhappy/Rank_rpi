@@ -1,5 +1,14 @@
+/*
+*Name: mmu.h
+*Author: Rank 
+*Contact:<441552318@qq.com>
+*/
+
 #ifndef MMU_H
 #define MMU_H
+
+#define phy2vir(phy, v2poff) ((phy) + (v2poff))
+#define vir2phy(vir, v2poff) ((vir) - (v2poff))
 
 typedef struct
 {
