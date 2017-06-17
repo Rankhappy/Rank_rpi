@@ -221,7 +221,7 @@ loop1:
 	add r2, r2, #4 //add 4 for the line length offset (log2 16 bytes)
 	ldr r4, =0x3FF
 	ands r4, r4, r1, lsr #3 //R4 is the max number on the way size (right aligned)
-	clz r5, r4 ; //R5 is the bit position of the way size increment
+	clz r5, r4 //R5 is the bit position of the way size increment
 	ldr r7, =0x00007FFF
 	ands r7, r7, r1, lsr #13 //R7 is the max number of the index size (right aligned)
 loop2:
