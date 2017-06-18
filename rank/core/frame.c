@@ -121,6 +121,7 @@ static frame_t *_alloc_zone(zones_t *zones, zone_map_t *zone_map, uint32_t frame
 		return NULL;
 	}
 	frame->frames = (1<<order);
+	mmdbg("_alloc_zone:start_pfn = %d, idx = %d\n", zones->start_pfn, zone->idx);
 	frame->pfn = zones->start_pfn + zone->idx;
 	frame->type = TYPE_LINEAR_ZONE;
 

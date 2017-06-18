@@ -20,7 +20,12 @@
 #define FRAME_MASK (~((1<<FRAME_SHIFT)-1))
 #define FRAME_SIZE (1<<FRAME_SHIFT)
 
+#define mmdbg(fmt, args...)  printf("[RANK][MM][DEBUG]"fmt, ##args)
+#define mmerr(fmt, args...) printf("[RANK][MM][ERROR]"fmt, ##args)
+
+
 extern size_t g_v2p_off;
+extern void printf(const char *fmt, ...);
 
 static inline int size2order(size_t size, int max_order, int shift)
 {
@@ -33,7 +38,7 @@ static inline int size2order(size_t size, int max_order, int shift)
 		return max_order;
 	}
 	
-	while(size > 1)
+	while(size > 0)
 	{
 		order++;
 		size >>= 1;

@@ -88,6 +88,7 @@ void *low_malloc(size_t size)
 		list_foreach(&g_free_list[i], chunk_node)
 		{
 			chunk = list_data(chunk_node, chunk_t, node);
+			mmdbg("low_malloc:chunk = 0x%08x.\n", (uint32_t)chunk);
 			if(chunk->size >= size)
 			{
 				chunk_ok = 1;
@@ -102,6 +103,11 @@ void *low_malloc(size_t size)
 		}
 	}
 
+	if(i > LOW_MAX_ORDER)
+	{
+		return NULL;
+	}
+
 	/*Add the remain area to the free list.*/
 	if(chunk->size > size)
 	{
@@ -110,11 +116,12 @@ void *low_malloc(size_t size)
 		{
 			chunk->size -= remain;
 			chunk_t *temp = (chunk_t *)((addr_t)chunk+chunk->size);
+			mmdbg("low_malloc:remain chunk = 0x%08x.\n", (uint32_t)temp);
 			temp->size = remain;
 			temp->flag = chunk->size;
 			list_init(&temp->node);
 			order = size2order(remain, LOW_MAX_ORDER, LOW_SIZE_SHIFT);
-			list_add_head(&g_free_list[order], &chunk->node);
+			list_add_head(&g_free_list[order], &temp->node);
 		}
 	}
 

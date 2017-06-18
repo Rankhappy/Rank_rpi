@@ -20,13 +20,13 @@
 
 __start:
 	b	reset
-	b	.			/* Undef */
-	b	smc_handle	/* Syscall */
-	b	.			/* Prefetch abort */
-	b	.			/* Data abort */
-	b	.			/* Reserved */
-	b	.			/* IRQ */
-	b	.			/* FIQ */
+	b	.							/* Undef */
+	b	smc_handle					/* Syscall */
+	b	.							/* Prefetch abort */
+	b	data_abort_handle			/* Data abort */
+	b	.							/* Reserved */
+	b	.							/* IRQ */
+	b	.							/* FIQ */
 	
 .size	__start, .-__start
 .endfunc
@@ -44,8 +44,7 @@ reset:
 
 	/*
 	*swich to svc mode, for raspberry pi, it is on hyp mode when booting.
-	*on armv8, 
-	*it seems can not modify the mode of cpsr directly,
+	*it seems can not modify the mode of cpsr directly to switch to svc,
 	*or use cps instruction is also forbidden.
 	*/
 	mrs r0, cpsr
@@ -280,6 +279,46 @@ smc_handle:
 	mcr p15, 0, r1, c1, c1, 0
 	movs pc, lr
 .size	smc_handle, .-smc_handle
+.endfunc
+
+.func data_abort_handle
+.type data_abort_handle, %function
+data_abort_handle:
+	ldr sp, =sp_except
+	sub lr, lr, #8
+	str lr, [sp]
+	mrs lr, spsr
+	str lr, [sp, #4]
+
+	bic	lr, lr, #(PSR_MODE_MASK)
+	orr	lr, lr, #(PSR_MODE_SVC | PSR_I_BIT | PSR_F_BIT)
+	msr	cpsr_c, lr
+
+	sub	sp, sp, #(4*17) //r0~r14, abt_r14(pc), abt_spsr(cpsr)
+	stmia sp, {r0-r12}
+
+	ldr	r0, =sp_except
+	ldmia r0, {r3, r4}
+
+	add	r1, sp, #(4*17)
+	mov	r2, lr
+	add	r0, sp, #(4*13)
+	stmia r0, {r1-r4}
+
+	mov	fp, #0
+	mov	r0, sp
+	mrc	p15, 0, r1, c6, c0, 0 //dfar
+	mrc	p15, 0, r2, c5, c0, 0 //dfsr
+	mov	r4, sp
+	bic	sp, sp, #7
+	bl data_abort_dump
+	mov	sp, r4
+	ldr	r1, [r4, #(4*16)]
+	msr	spsr_cxsf, r1
+	b . //stop as now.
+	ldmia r0, {r1-r15}^
+	
+.size	data_abort_handle, .-data_abort_handle
 .endfunc
 
 	.align	2

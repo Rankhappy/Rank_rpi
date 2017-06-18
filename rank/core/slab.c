@@ -37,7 +37,7 @@ static int slab_init(slabs_t *slabs, int obj_size, uint32_t frames)
 {
 	slabs->frames = frames;
 	slabs->obj_size = obj_size;
-	slabs->objects = (FRAME_SIZE-sizeof(slab_t))/obj_size;
+	slabs->objects = (frames<<FRAME_SHIFT)/obj_size;
 
 	list_init(&slabs->partial_list);
 	list_init(&slabs->full_list);
@@ -49,6 +49,8 @@ static void *slab_alloc(slabs_t *slabs)
 {
 	void *obj;
 	slab_t *slab;
+
+	mmdbg("slab_alloc:obj_size = 0x%x, objects = %d.\n", slabs->obj_size, slabs->objects);
 	
 	if(!list_empty(&slabs->partial_list))
 	{
@@ -74,10 +76,12 @@ static void *slab_alloc(slabs_t *slabs)
 		slab->frame = frame;
 		slab->slabs = slabs;
 		/*Get the virtual address of the frame*/
+		mmdbg("slab_alloc:pfn = %d, off = 0x%08x\n", frame->pfn, g_v2p_off);
 		slab->base = (void *)phy2vir(frame->pfn << FRAME_SHIFT, g_v2p_off);
 		slab->availables = slabs->objects;
 		slab->obj_head = 0;
 		/*Link all of the objs*/
+		mmdbg("slab_alloc:base = 0x%08x.\n", (uint32_t)slab->base);
 		for(i = 0; i < slabs->objects; i++)
 		{
 			*((uint32_t *)(slab->base+i*slabs->obj_size)) = i+1;
@@ -148,7 +152,7 @@ int rmalloc_slab_init(void)
 
 	for(order = 0; order <= RMALLOC_MAX_ORDER; order++)
 	{
-		rc = slab_init(&rmalloc_slabs[order], 1<<order, 1);
+		rc = slab_init(&rmalloc_slabs[order], 1<<(order+RMALLOC_SIZE_SHIFT), 1);
 		if(rc)
 		{
 			return rc;
@@ -171,6 +175,8 @@ void *rmalloc(size_t size)
 	}
 
 	order = size2order(size, RMALLOC_MAX_ORDER, RMALLOC_SIZE_SHIFT);
+
+	mmdbg("slab_alloc:size = 0x%x, order = %d.\n", size, order);
 
 	return slab_alloc(&rmalloc_slabs[order]);
 }

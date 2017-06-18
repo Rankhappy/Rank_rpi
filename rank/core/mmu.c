@@ -13,7 +13,8 @@
 #define PT1_FIXED_FLAG_T (1 << 0)
 #define PT2_FIXED_FLAG ((1 << 1)|(1 << 4))
 
-#define mdbg(fmt, args...) printf("[RANK][MMU][DEBUG]"fmt, ##args)
+#define mdbg(fmt, args...)
+//#define mdbg(fmt, args...)  printf("[RANK][MMU][DEBUG]"fmt, ##args)
 #define merr(fmt, args...) printf("[RANK][MMU][ERROR]"fmt, ##args)
 
 addr_t g_pt1_addr;

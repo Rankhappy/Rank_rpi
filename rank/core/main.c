@@ -48,6 +48,7 @@ boot_param_t g_boot_param;
 
 uint8_t g_pt2_map[2];
 uint32_t sp_idle[1024];
+uint32_t sp_except[2];
 
 #define ARRAY_NUM 2 //two blocks are enough
 DECALRE_PT2_ARRAY(0)
@@ -64,7 +65,7 @@ int raise(int signo)
 	return 0;
 }
 
-addr_t alloc_pt2_low(int blocks)
+static addr_t alloc_pt2_low(int blocks)
 {
 	int i;
 
@@ -101,7 +102,7 @@ addr_t alloc_pt2_low(int blocks)
 	return pt2_addr;
 }
 
-int do_io_map(void)
+static int do_io_map(void)
 {
 	int ret;
 
@@ -117,7 +118,7 @@ int do_io_map(void)
 	return ret;
 }
 
-int do_linear_map(void)
+static int do_linear_map(void)
 {
 	int ret;
 
@@ -139,7 +140,7 @@ int do_linear_map(void)
 	return ret;
 }
 
-int mm_init(void)
+static int mmu_init(void)
 {
 	int ret;
 
@@ -165,6 +166,23 @@ int mm_init(void)
 	return ret;
 }
 
+void data_abort_dump(uint32_t *regs, uint32_t dfar, uint32_t dfsr)
+{
+	printf("Data abort@PC:0x%08x!\n", regs[15]);
+
+	printf("Core dump Registers: R0-R15, CPSR:\n");
+
+	printf("0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x\n", \
+		regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7]);
+
+	printf("0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x\n", \
+		regs[8], regs[9], regs[10], regs[11], regs[12], regs[13], regs[14], regs[15]);
+
+	printf("0x%08x\n", regs[16]);
+
+	printf("DFAR:0x%08x DFSR:0x%08x\n", dfar, dfsr);
+}
+
 /*
 * Main function.
 */
@@ -184,15 +202,15 @@ int rank_main(void)
 	rdbg("boot params: ebss= 0x%x, pt1_addr = 0x%x, loffset = 0x%x\n", \
 		g_boot_param.ebss, g_boot_param.pt1_addr, g_boot_param.loffset);
 	
-	if(mm_init() == -1)
+	if(mmu_init() == -1)
 	{
-		rdbg("mm init failed!\n");
+		rdbg("mmu init failed!\n");
 		return -1;
 	}
 
 	print_init(UART0_BASE_VADDR);
 	
-	rdbg("mm init success!\n");
+	rdbg("mmu init success!\n");
 
 	mm_start = allign_up(g_boot_param.ebss, 4);
 	low_area_size = (mm_start&((1<<PAGE_SHIFT)-1))+PAGE_SIZE;
@@ -205,7 +223,8 @@ int rank_main(void)
 
 	mm_start += low_area_size;
 	mm_start = allign_up(mm_start, PAGE_SHIFT);
-	if(zones_init(mm_start, LINEAR_MEM_SIZE) == -1)
+	rdbg("g_v2p_off= 0x%08x\n", g_v2p_off);
+	if(zones_init(vir2phy(mm_start, g_v2p_off), LINEAR_MEM_SIZE) == -1)
 	{
 		rdbg("zones init failed!\n");
 		return -1;
@@ -223,6 +242,7 @@ int rank_main(void)
 	uint32_t *p = (uint32_t *)rmalloc(sizeof(uint32_t)*20);
 	*p = 0;
 	*(p+19) = 0;
+	rdbg("rmalloc test ok!\n");
 #endif
 	
 	return 0;
