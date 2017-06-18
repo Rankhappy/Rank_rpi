@@ -14,21 +14,23 @@
 #define allign_up(x, a) (((x)+((1<<(a))-1))&(~((1<<(a))-1)))
 #define allign_down(x, a) ((x)&(~((1<<(a))-1)))
 
+#define LINEAR_MEM_SIZE  0x2000000
+
 #define FRAME_SHIFT 12
 #define FRAME_MASK (~((1<<FRAME_SHIFT)-1))
 #define FRAME_SIZE (1<<FRAME_SHIFT)
 
 extern size_t g_v2p_off;
 
-static inline int size2order(size_t size)
+static inline int size2order(size_t size, int max_order, int shift)
 {
 	int order = 0;
 
-	size >>= 4;
+	size >>= shift;
 	
-	if(size >= (1<<5))
+	if(size >= (1<<max_order))
 	{
-		return 5;
+		return max_order;
 	}
 	
 	while(size > 1)
@@ -40,9 +42,9 @@ static inline int size2order(size_t size)
 	return order;
 }
 
-static inline int order2size(int order)
+static inline int order2size(int order, int shift)
 {
-	return (1<<(order+4));
+	return (1<<(order+shift));
 }
 
 #endif

@@ -10,7 +10,7 @@ LD_SCRIPT  = ld.script
 CROSS_COMPILE = arm-linux-gnueabihf-
 
 AS = $(CROSS_COMPILE)gcc -D__ASSEMBLY__ -g -fno-builtin -Wall -Wstrict-prototypes -Wshadow -Wundef  -mtune=cortex-a53 -march=armv8-a  -mfloat-abi=soft -pipe
-CC = $(CROSS_COMPILE)gcc -g  -fno-builtin -Wall -Wstrict-prototypes -Wshadow -Wundef -mtune=cortex-a53 -march=armv8-a -mfloat-abi=soft -nostdlib -pipe 
+CC = $(CROSS_COMPILE)gcc -g  -fno-builtin -Wall -Wstrict-prototypes -Wshadow -Wundef -Wno-unused-function -mtune=cortex-a53 -march=armv8-a -mfloat-abi=soft -nostdlib -pipe 
 LD = $(CROSS_COMPILE)ld -g -nostartfiles -nodefaultlibs
 OBJCOPY = $(CROSS_COMPILE)objcopy
 

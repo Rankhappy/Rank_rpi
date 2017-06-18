@@ -8,8 +8,8 @@
 #include "type.h"
 #include "arm.h"
 #include "mmu.h"
+#include "mm.h"
 
-#define LINEAR_MEM_SIZE  0x1000000
 #define IO_BASE_PADDR    0x3f200000
 #define IO_BASE_VADDR    0xff200000
 
@@ -125,7 +125,7 @@ int do_linear_map(void)
 
 	MEMORY_NOMAL(flag);
 
-	addr_t vaddr = allign_up(g_boot_param.ebss, 12);
+	addr_t vaddr = allign_up(g_boot_param.ebss, PAGE_SHIFT);
 	addr_t paddr = vaddr - g_boot_param.loffset;
 
 	ret = do_mmu_map(vaddr, paddr, LINEAR_MEM_SIZE, flag, alloc_pt2_low);
@@ -170,6 +170,9 @@ int mm_init(void)
 */
 int rank_main(void)
 {
+	addr_t mm_start;
+	size_t low_area_size;
+
 	uart_init(UART0_BASE_PADDR, UART_CLK, 115200);
 	
 	print_init(UART0_BASE_PADDR);
@@ -191,6 +194,37 @@ int rank_main(void)
 	
 	rdbg("mm init success!\n");
 
+	mm_start = allign_up(g_boot_param.ebss, 4);
+	low_area_size = (mm_start&((1<<PAGE_SHIFT)-1))+PAGE_SIZE;
+	if(low_area_init(mm_start, low_area_size) == -1)
+	{
+		rdbg("low area init failed!\n");
+		return -1;
+	}
+	rdbg("low area init success!\n");
+
+	mm_start += low_area_size;
+	mm_start = allign_up(mm_start, PAGE_SHIFT);
+	if(zones_init(mm_start, LINEAR_MEM_SIZE) == -1)
+	{
+		rdbg("zones init failed!\n");
+		return -1;
+	}
+	rdbg("zones init success!\n");
+
+	if(rmalloc_slab_init() == -1)
+	{
+		rdbg("rmalloc slab init failed!\n");
+		return -1;
+	}
+	rdbg("rmalloc slab init success!\n");
+
+#if 1//test rmalloc, if needed, can enable.
+	uint32_t *p = (uint32_t *)rmalloc(sizeof(uint32_t)*20);
+	*p = 0;
+	*(p+19) = 0;
+#endif
+	
 	return 0;
 }
 
