@@ -31,7 +31,7 @@ typedef struct
 	list_node_t node;
 }slab_t;
 
-static slabs_t rmalloc_slabs[RMALLOC_MAX_ORDER];
+static slabs_t rmalloc_slabs[RMALLOC_MAX_ORDER+1];
 
 static int slab_init(slabs_t *slabs, int obj_size, uint32_t frames)
 {
@@ -90,7 +90,10 @@ static void *slab_alloc(slabs_t *slabs)
 		for(i = 0; i < slabs->frames; i++)
 		{
 			set_frame_priv(TYPE_LINEAR_ZONE, frame->pfn+i, (void *)slab);
+			mmdbg("slab_alloc:slab = 0x%08x.\n", (uint32_t)slab);
 		}
+		list_init(&slab->node);
+		list_add_head(&slabs->partial_list, &slab->node);
 	}
 	
 	obj = (void *)((addr_t)(slab->base) + slab->obj_head*slabs->obj_size);
@@ -123,6 +126,7 @@ static void slab_free(void *obj)
 
 	/*Should add type as the function's input parameter rather than fixed here?*/
 	slab = get_slab_byobj(TYPE_LINEAR_ZONE, obj);
+	mmdbg("slab_free:slab = 0x%08x.\n", (uint32_t)slab);
 	slabs = slab->slabs;
 	idx = ((addr_t)obj-(addr_t)(slab->base))/slabs->obj_size;
 

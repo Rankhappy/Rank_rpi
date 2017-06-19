@@ -243,6 +243,8 @@ int rank_main(void)
 	*p = 0;
 	*(p+19) = 0;
 	rdbg("rmalloc test ok!\n");
+	rfree(p);
+	rdbg("rfree test ok!\n");
 #endif
 	
 	return 0;
