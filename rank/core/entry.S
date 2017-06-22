@@ -10,8 +10,6 @@
 
 #include "arm.h"
 
-.extern sp_test
-
 .text
 .align	5
 .global __start
@@ -29,6 +27,28 @@ __start:
 	b	.							/* FIQ */
 	
 .size	__start, .-__start
+.endfunc
+
+.global start_secondary_cpu
+.func start_secondary_cpu
+.type start_secondary_cpu, %function
+start_secondary_cpu:
+	ldr r1, =reset
+	ldr r2, =g_v2p_off
+	ldr r2, [r2]
+	sub r1, r1, r2
+	mov r2, #0xf0000000
+	cmp r0, #1
+	streq r1, [r2,#0x9c]
+	beq skip_3
+	cmp r0, #2
+	streq r1, [r2,#0xac]
+	beq skip_3
+	cmp r0, #3
+	streq r1, [r2,#0xbc]
+skip_3:
+	mov pc, lr
+.size start_secondary_cpu, .-start_secondary_cpu
 .endfunc
 
 .func reset
@@ -79,16 +99,22 @@ reset:
 	*r10 = p1 virtual address
 	*r11 = p2 virtual address
 	*/
-	ldmia r6, {r0, r1, r8, r10, r11}
+	ldmia r6, {r0, r5, r8, r10, r11}
 	sub r12, r0, r6  //r12 = offset of vir-phy
-	sub r1, r1, r12
+	sub r7, r10, r12 //r7 = p1 phy addr	
+	
+	bl get_cpuid
+	cmp r0, #0
+	bne skip_1
+	
+	sub r5, r5, r12
 	sub r4, r8, r12
 	/*clear bss, r1 = _sbss, r8 = _ebss*/
 	mov	r2, #0
 	mov	r3, #0
 clear_bss:
-	stmia r1!, {r2, r3}
-	cmp	r1, r4
+	stmia r5!, {r2, r3}
+	cmp	r5, r4
 	bls	clear_bss
 	dmb
 
@@ -98,7 +124,7 @@ clear_bss:
 	bic r5, r5, #0xf00 //r5 = phy addr
 	add r4, r5, r12 //r4 = vir addr
 	sub r6, r11, r12 //r6 = p2 phy addr
-	sub r7, r10, r12 //r7 = p1 phy addr	
+	//sub r7, r10, r12 //r7 = p1 phy addr	
 	ldr r2, =0xfff
 	add r3, r8, r2
 	sub r3, r3, r4
@@ -168,10 +194,16 @@ p2Loop:
 	dmb
 #endif
 
+	/*save the booting param*/
+	ldr r0, =g_boot_param
+	sub r0, r0, r12
+	stmia r0, {r8, r10, r12}
+
 	/*
 	*set ttbr ttbcr
 	*r7 = p1 phy addr
 	*/
+skip_1:
 	orr	r0, r7, #((1<<3)|(1<<6)|(1<<1)|(1<<5))
 	mcr p15, 0, r0, c2, c0, 0
 	mcr p15, 0, r0, c2, c0, 1
@@ -185,11 +217,10 @@ p2Loop:
 	ldr	r0, =0x05050505
 	mcr p15, 0, r0, c3, c0, 0
 
-
-	/*save the booting param*/
-	ldr r0, =g_boot_param
-	sub r0, r0, r12
-	stmia r0, {r8, r10, r12}
+	/*enable actlr smp*/
+	mrc p15, 0, r0, c1, c0, 1
+	orr r0, r0, #(1<<6)
+	mcr p15, 0, r0, c1, c0, 1
 
 	/*invalidate icache bp and tlbs*/
 	mov	r0, #0
@@ -201,44 +232,10 @@ p2Loop:
 	dsb
 	isb
 
-	/*invalidate and clean the entire dcache*/
-	mrc p15, 1, r0, c0, c0, 1     //Read CLIDR into R0
-	ands r3, r0, #0x07000000 
-	mov r3, r3, lsr #23           //Cache level value (naturally aligned)
-	beq finished
-	mov r10, #0
-loop1:
-	add r2, r10, r10, lsr #1    //Work out 3 x cachelevel
-	mov r1, r0, lsr r2       //bottom 3 bits are the Cache type for this level
-	and r1, r1, #7       //get those 3 bits alone
-	cmp r1, #2
-	blt skip       //no cache or only instruction cache at this level
-	mcr p15, 2, r10, c0, c0, 0 //write CSSELR from R10
-	isb      //ISB to sync the change to the CCSIDR
-	mrc p15, 1, R1, c0, c0, 0 //read current CCSIDR to R1
-	and r2, r1, #7 //extract the line length field
-	add r2, r2, #4 //add 4 for the line length offset (log2 16 bytes)
-	ldr r4, =0x3FF
-	ands r4, r4, r1, lsr #3 //R4 is the max number on the way size (right aligned)
-	clz r5, r4 //R5 is the bit position of the way size increment
-	ldr r7, =0x00007FFF
-	ands r7, r7, r1, lsr #13 //R7 is the max number of the index size (right aligned)
-loop2:
-	mov r9, r4  //R9 working copy of the max way size (right aligned)
-loop3:
-	orr r11, r10, r9, lsl r5 //factor in the way number and cache number into R11
-	orr r11, r11, r7, lsl r2  //factor in the index number
-	mcr p15, 0, r11, c7, c14, 2 //DCCISW, clean&invalidate by set/way
-	subs r9, r9, #1 //decrement the way number
-	bge loop3
-	subs r7, r7, #1 //decrement the index
-	bge loop2
-skip:
-	add r10, r10, #2 //increment the cache number
-	cmp r3, r10
-	bgt loop1
-	dsb
-finished:
+	adr sp, sp_temp
+	bl get_cpuid
+	add sp, sp, r0, lsl #6
+	bl invclean_all_dcache
 
 	/*set sctlr, enable mmu*/
 	mrc p15, 0, r0, c1, c0, 0
@@ -262,10 +259,14 @@ finished:
 vstart:
 	nop
 	nop
-	ldr sp, =sp_idle
-	ldr r0, =g_boot_param
-	//stmia r0, {r8, r10, r12}
-	bl rank_main
+	bl get_cpuid
+	cmp r0, #0
+	ldreq sp, =sp_idle
+	ldreq r0, =g_boot_param
+	ldrne sp, =sp_secondary
+	addne sp, sp, r0, lsl #6
+	bleq rank_main
+	blne secondary_cpu
 	b .
 .size reset, .-reset
 .endfunc
@@ -317,8 +318,7 @@ data_abort_handle:
 	msr	spsr_cxsf, r1
 	b . //stop as now.
 	ldmia r0, {r1-r15}^
-	
-.size	data_abort_handle, .-data_abort_handle
+.size data_abort_handle, .-data_abort_handle
 .endfunc
 
 	.align	2
@@ -330,16 +330,42 @@ LC0:
 	.word	pt1
 	.word	pt2
 	.size	LC0, .-LC0
-
+	
+	.align	3
+	.type	sp_temp, #object
+	.space	4*64	
+sp_temp:
+	.size sp_temp, .-sp_temp
+	
 	.section .bss
+	.align	3
+	.type	sp_idle, #object
+	.space	4096	
+sp_idle:
+	.size sp_idle, .-sp_idle
+
+	.align	3
+	.type	sp_except, #object
+	.space	8	
+sp_except:
+	.size sp_except, .-sp_except
+
+	.align	3
+	.type	sp_secondary, #object
+	.space	4*64	
+sp_secondary:
+	.size sp_secondary, .-sp_secondary
+
 	.align	14
 	.type	pt1, #object
 pt1:
 	.space	0x4000
+	.size pt1, .-pt1
 
 	.align	10
 	.type	pt2, #object
 pt2:
 	.space	0x400
+	.size pt2, .-pt2
 
 

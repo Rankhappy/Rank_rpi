@@ -1,4 +1,4 @@
-OBJ := entry.o
+OBJ := entry.o core.o
 OBJ += mmu.o uart.o
 OBJ += print.o main.o
 OBJ += low_malloc.o frame.o slab.o
@@ -23,6 +23,9 @@ $(BIN): $(OBJ) $(LD_SCRIPT)
 	mv $(BIN) ../bin/ -f
 	
 entry.o:  entry.S
+	$(AS) -c -o $@ $<
+
+core.o:  core.S
 	$(AS) -c -o $@ $<
 	
 %.o:%.c 

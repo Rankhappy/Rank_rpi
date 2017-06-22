@@ -10,7 +10,7 @@
 #include "type.h"
 
 #define UART0_BASE_PADDR    0x3f201000
-#define UART0_BASE_VADDR    0xff201000
+#define UART0_BASE_VADDR    0xef201000
 #define UART_CLK 48000000
 
 #define UART_DR		0x00 /* data register */

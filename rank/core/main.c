@@ -10,8 +10,11 @@
 #include "mmu.h"
 #include "mm.h"
 
-#define IO_BASE_PADDR    0x3f200000
-#define IO_BASE_VADDR    0xff200000
+#define IO_BASE1_PADDR    0x3f200000
+#define IO_BASE1_VADDR    0xef200000
+
+#define IO_BASE2_PADDR    0x40000000
+#define IO_BASE2_VADDR    0xf0000000
 
 #define MEMORY_NOMAL(flag)\
 { \
@@ -44,11 +47,11 @@ typedef struct
 	size_t loffset;
 }boot_param_t;
 
+static uint32_t lock;
+
 boot_param_t g_boot_param;
 
 uint8_t g_pt2_map[2];
-uint32_t sp_idle[1024];
-uint32_t sp_except[2];
 
 #define ARRAY_NUM 2 //two blocks are enough
 DECALRE_PT2_ARRAY(0)
@@ -110,9 +113,16 @@ static int do_io_map(void)
 
 	MEMORY_DEVICE(flag);
 
-	addr_t vaddr = IO_BASE_VADDR;
-	addr_t paddr = IO_BASE_PADDR;
+	addr_t vaddr = IO_BASE1_VADDR;
+	addr_t paddr = IO_BASE1_PADDR;
+	ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
+	if(ret < 0)
+	{
+		return ret;
+	}
 
+	vaddr = IO_BASE2_VADDR;
+	paddr = IO_BASE2_PADDR;
 	ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
 
 	return ret;
@@ -183,6 +193,25 @@ void data_abort_dump(uint32_t *regs, uint32_t dfar, uint32_t dfsr)
 	printf("DFAR:0x%08x DFSR:0x%08x\n", dfar, dfsr);
 }
 
+extern uint32_t get_cpuid(void);
+extern void spin_lock(uint32_t *);
+extern void spin_unlock(uint32_t *);
+
+void secondary_cpu(void)
+{
+	spin_lock(&lock);
+
+	uint32_t cpuid = get_cpuid();
+
+	rdbg("i am cpu#%d\n", cpuid);
+
+	spin_unlock(&lock);
+}
+
+extern void start_secondary_cpu(uint32_t);
+extern void invclean_all_dcache(void);
+extern void invclean_dcache_byva(uint32_t, uint32_t);
+
 /*
 * Main function.
 */
@@ -246,6 +275,10 @@ int rank_main(void)
 	rfree(p);
 	rdbg("rfree test ok!\n");
 #endif
+
+	start_secondary_cpu(1);
+	start_secondary_cpu(2);
+	start_secondary_cpu(3);
 	
 	return 0;
 }
