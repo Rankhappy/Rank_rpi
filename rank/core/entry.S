@@ -31,7 +31,7 @@ __start:
 
 .global start_secondary_cpu
 .func start_secondary_cpu
-.type start_secondary_cpu, %function
+.type start_secondary_cpu, %function
 start_secondary_cpu:
 	ldr r1, =reset
 	ldr r2, =g_v2p_off
@@ -68,13 +68,13 @@ reset:
 	*or use cps instruction is also forbidden.
 	*/
 	mrs r0, cpsr
-    bic r0,r0,#(PSR_MODE_MASK)
-    orr r0,r0,#(PSR_MODE_SVC)
-    orr r0, r0, #(PSR_I_BIT | PSR_F_BIT | PSR_A_BIT)
-    msr spsr_cxsf, r0
-    add r0, pc, #4
-    msr ELR_hyp, r0
-    eret
+    	bic r0,r0,#(PSR_MODE_MASK)
+    	orr r0,r0,#(PSR_MODE_SVC)
+    	orr r0, r0, #(PSR_I_BIT | PSR_F_BIT | PSR_A_BIT)
+    	msr spsr_cxsf, r0
+    	add r0, pc, #4
+    	msr ELR_hyp, r0
+    	eret
 
 	/*set vbar temporarily*/
 	adr r0, __start
@@ -234,7 +234,7 @@ skip_1:
 
 	adr sp, sp_temp
 	bl get_cpuid
-	add sp, sp, r0, lsl #6
+	sub sp, sp, r0, lsl #6
 	bl invclean_all_dcache
 
 	/*set sctlr, enable mmu*/
@@ -264,7 +264,7 @@ vstart:
 	ldreq sp, =sp_idle
 	ldreq r0, =g_boot_param
 	ldrne sp, =sp_secondary
-	addne sp, sp, r0, lsl #6
+	subne sp, sp, r0, lsl #6
 	bleq rank_main
 	blne secondary_cpu
 	b .

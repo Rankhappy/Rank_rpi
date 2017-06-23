@@ -67,7 +67,7 @@ exit:
 
 .global invclean_all_dcache
 .func invclean_all_dcache
-.type invclean_all_dcache, %function
+.type invclean_all_dcache, %function
 invclean_all_dcache:
 	push	{r4-r12}
 	mrc p15, 1, r0, c0, c0, 1	  //Read CLIDR into R0
