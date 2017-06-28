@@ -13,6 +13,7 @@ typedef unsigned int uint32_t;
 typedef uint32_t page_t;
 typedef uint32_t size_t;
 typedef uint32_t addr_t;
+typedef uint32_t spin_lock_t;
 
 #define NULL (void *)0
 

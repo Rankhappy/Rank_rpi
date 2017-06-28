@@ -38,11 +38,11 @@ void uart_init(uint32_t base, uint32_t uart_clk, uint32_t baud_rate)
 
 	/*gpio select for uart0*/
 	gpsel1 = readl(GPFSEL1);
-    gpsel1 &= ~(7<<12);
-    gpsel1 |= 4<<12;
-    gpsel1 &= ~(7<<15);
-    gpsel1 |= 4<<15;
-    writel(GPFSEL1, gpsel1);
+	gpsel1 &= ~(7<<12);
+	gpsel1 |= 4<<12;
+	gpsel1 &= ~(7<<15);
+	gpsel1 |= 4<<15;
+	writel(GPFSEL1, gpsel1);
 
 	if (baud_rate) {
 		uint32_t divisor = (uart_clk * 4) / baud_rate;
@@ -83,25 +83,25 @@ void uart_test(void)
 #if 0 //for booting debug. if needed, can enable.
 void _print_rigister (uint32_t r)
 {
-    unsigned int rb;
-    unsigned int rc;
+	unsigned int rb;
+	unsigned int rc;
 
-    rb = 32;
-    for(;;)
-    {
-        rb -= 4;
-        rc = (r >> rb) & 0xF;
-        if(rc > 9) rc += 0x37;
-        else rc+=0x30;
-        uart_putc(rc, UART0_BASE_PADDR);
-        if(rb==0) break;
-    }
+	rb = 32;
+	for(;;)
+	{
+        	rb -= 4;
+       		rc = (r >> rb) & 0xF;
+        	if(rc > 9) rc += 0x37;
+        	else rc+=0x30;
+        	uart_putc(rc, UART0_BASE_PADDR);
+        	if(rb==0) break;
+	}
     
-    uart_putc(0x20, UART0_BASE_PADDR);
+	uart_putc(0x20, UART0_BASE_PADDR);
 }
 void print_rigister (uint32_t r)
 {
-    _print_rigister(r);
+	_print_rigister(r);
 	uart_putc('\r', UART0_BASE_PADDR);
 	uart_putc('\n', UART0_BASE_PADDR);
 }

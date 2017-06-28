@@ -340,7 +340,7 @@ sp_temp:
 	.section .bss
 	.align	3
 	.type	sp_idle, #object
-	.space	4096	
+	.space	1024	
 sp_idle:
 	.size sp_idle, .-sp_idle
 

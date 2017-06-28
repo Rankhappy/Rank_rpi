@@ -40,5 +40,8 @@ extern void *get_frame_priv(type_zone_t, uint32_t);
 extern int rmalloc_slab_init(void);
 extern void *rmalloc(size_t);
 extern void rfree(void *);
+extern int stack_slab_init(void);
+extern void *stack_alloc(void);
+extern void stack_free(void *);
 
 #endif

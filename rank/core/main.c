@@ -9,6 +9,8 @@
 #include "arm.h"
 #include "mmu.h"
 #include "mm.h"
+#include "thread.h"
+#include "core.h"
 
 #define IO_BASE1_PADDR    0x3f200000
 #define IO_BASE1_VADDR    0xef200000
@@ -47,7 +49,7 @@ typedef struct
 	size_t loffset;
 }boot_param_t;
 
-static uint32_t lock;
+static spin_lock_t cpu_lock;
 
 boot_param_t g_boot_param;
 
@@ -193,24 +195,37 @@ void data_abort_dump(uint32_t *regs, uint32_t dfar, uint32_t dfsr)
 	printf("DFAR:0x%08x DFSR:0x%08x\n", dfar, dfsr);
 }
 
-extern uint32_t get_cpuid(void);
-extern void spin_lock(uint32_t *);
-extern void spin_unlock(uint32_t *);
+void idle_entry(void)
+{
+	thread_arg_t arg;
+	uint32_t cpuid = get_cpuid();
+
+	arg.cpu_mask = 1 << cpuid;
+	arg.prio = 255;
+
+	idle_thread_create(&arg);
+
+	while(1)
+	{
+		spin_lock(&cpu_lock);
+		schedule();
+		spin_unlock(&cpu_lock);
+	}
+}
 
 void secondary_cpu(void)
 {
-	spin_lock(&lock);
+	spin_lock(&cpu_lock);
 
 	uint32_t cpuid = get_cpuid();
 
 	rdbg("i am cpu#%d\n", cpuid);
 
-	spin_unlock(&lock);
+	spin_unlock(&cpu_lock);
+	idle_entry();
 }
 
 extern void start_secondary_cpu(uint32_t);
-extern void invclean_all_dcache(void);
-extern void invclean_dcache_byva(uint32_t, uint32_t);
 
 /*
 * Main function.
@@ -267,6 +282,13 @@ int rank_main(void)
 	}
 	rdbg("rmalloc slab init success!\n");
 
+	if(stack_slab_init() == -1)
+	{
+		rdbg("stack slab init failed!\n");
+		return -1;
+	}
+	rdbg("stack slab init success!\n");
+
 #if 1//test rmalloc, if needed, can enable.
 	uint32_t *p = (uint32_t *)rmalloc(sizeof(uint32_t)*20);
 	*p = 0;
@@ -279,6 +301,8 @@ int rank_main(void)
 	start_secondary_cpu(1);
 	start_secondary_cpu(2);
 	start_secondary_cpu(3);
+
+	idle_entry();
 	
 	return 0;
 }

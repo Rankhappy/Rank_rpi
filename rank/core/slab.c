@@ -11,6 +11,7 @@
 
 #define RMALLOC_MAX_ORDER 5
 #define RMALLOC_SIZE_SHIFT 4
+#define STACK_SIZE 1024
 
 typedef struct
 {
@@ -32,6 +33,7 @@ typedef struct
 }slab_t;
 
 static slabs_t rmalloc_slabs[RMALLOC_MAX_ORDER+1];
+static slabs_t stack_slab;
 
 static int slab_init(slabs_t *slabs, int obj_size, uint32_t frames)
 {
@@ -186,6 +188,25 @@ void *rmalloc(size_t size)
 }
 
 void rfree(void *addr)
+{
+	slab_free(addr);
+}
+
+int stack_slab_init(void)
+{
+	int rc;
+
+	rc = slab_init(&stack_slab, STACK_SIZE, 2);
+
+	return rc;
+}
+
+void *stack_alloc(void)
+{
+	return slab_alloc(&stack_slab);
+}
+
+void stack_free(void *addr)
 {
 	slab_free(addr);
 }

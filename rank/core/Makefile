@@ -2,6 +2,7 @@ OBJ := entry.o core.o
 OBJ += mmu.o uart.o
 OBJ += print.o main.o
 OBJ += low_malloc.o frame.o slab.o
+OBJ += heap.o thread.o
 
 ELF = rank.elf
 BIN = rank.bin
