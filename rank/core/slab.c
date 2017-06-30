@@ -148,6 +148,7 @@ static void slab_free(void *obj)
 	{
 		list_delete(&slab->node);
 		free_frames(slab->frame);
+		low_free(slab);
 	}
 }
 
@@ -182,7 +183,7 @@ void *rmalloc(size_t size)
 
 	order = size2order(size, RMALLOC_MAX_ORDER, RMALLOC_SIZE_SHIFT);
 
-	mmdbg("slab_alloc:size = 0x%x, order = %d.\n", size, order);
+	mmdbg("rmalloc:size = 0x%x, order = %d.\n", size, order);
 
 	return slab_alloc(&rmalloc_slabs[order]);
 }

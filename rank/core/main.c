@@ -49,7 +49,7 @@ typedef struct
 	size_t loffset;
 }boot_param_t;
 
-static spin_lock_t cpu_lock;
+static spin_lock_t g_cpu_lock;
 
 boot_param_t g_boot_param;
 
@@ -195,36 +195,63 @@ void data_abort_dump(uint32_t *regs, uint32_t dfar, uint32_t dfsr)
 	printf("DFAR:0x%08x DFSR:0x%08x\n", dfar, dfsr);
 }
 
+void cpu_lock(void)
+{
+	spin_lock(&g_cpu_lock);
+}
+
+void cpu_unlock(void)
+{
+	spin_unlock(&g_cpu_lock);
+}
+
 void idle_entry(void)
 {
 	thread_arg_t arg;
 	uint32_t cpuid = get_cpuid();
 
-	arg.cpu_mask = 1 << cpuid;
+	arg.cpu_mask = (~(1 << cpuid)) & 0x0f;
 	arg.prio = 255;
 
+	cpu_lock();
 	idle_thread_create(&arg);
+	cpu_unlock();
 
 	while(1)
 	{
-		spin_lock(&cpu_lock);
-		schedule();
-		spin_unlock(&cpu_lock);
+		cpu_lock();
+		/*if return 0, we unlock at the other point.*/
+		if(schedule() == -1)
+		{
+			cpu_unlock();
+		}
 	}
 }
-
+ 
 void secondary_cpu(void)
 {
-	spin_lock(&cpu_lock);
+	cpu_lock();
 
 	uint32_t cpuid = get_cpuid();
 
-	rdbg("i am cpu#%d\n", cpuid);
+	rdbg("secondary_cpu:i am cpu#%d.\n", cpuid);
 
-	spin_unlock(&cpu_lock);
+	cpu_unlock();
 	idle_entry();
 }
 
+#if 1 //thread test
+void thread_test(void *arg)
+{
+	cpu_lock();
+	
+	uint32_t cpuid = get_cpuid();
+	
+	rdbg("thread_test:i am cpu#%d.\n", cpuid);
+	
+	cpu_unlock();
+}
+#endif
 extern void start_secondary_cpu(uint32_t);
 
 /*
@@ -301,6 +328,17 @@ int rank_main(void)
 	start_secondary_cpu(1);
 	start_secondary_cpu(2);
 	start_secondary_cpu(3);
+
+#if 1 //test thread
+	thread_arg_t arg;
+	arg.arg = NULL;
+	arg.cpu_mask = 0;
+	arg.entry = thread_test;
+	arg.prio = 0;
+	cpu_lock();
+	thread_create(&arg);
+	cpu_unlock();
+#endif
 
 	idle_entry();
 	

@@ -137,6 +137,9 @@ void low_free(void *addr)
 	next_chunk = (chunk_t *)((addr_t)chunk+chunk->size);
 	pre_chunk = (chunk_t *)((addr_t)chunk-(chunk->flag&(~FLAG_ALLOC_BIT)));
 
+	mmdbg("low_free:chunk = 0x%08x ,next_chunk = 0x%08x, pre_chunk = 0x%08x\n", \
+		(uint32_t)chunk, (uint32_t)next_chunk, (uint32_t)pre_chunk);
+
 	chunk->flag &= ~FLAG_ALLOC_BIT;
 
 	/*Combine with the next chunck.*/
@@ -159,6 +162,7 @@ void low_free(void *addr)
 		next_chunk->flag |= chunk->size;
 	}
 
+	mmdbg("low_free:chunk = 0x%08x.\n", (uint32_t)chunk);
 	list_init(&chunk->node);
 	order = size2order(chunk->size, LOW_MAX_ORDER, LOW_SIZE_SHIFT);
 	list_add_head(&g_free_list[order], &chunk->node);

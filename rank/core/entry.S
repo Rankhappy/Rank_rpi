@@ -260,11 +260,10 @@ vstart:
 	nop
 	nop
 	bl get_cpuid
+	ldr sp, =sp_idle
+	sub sp, sp, r0, lsl #10
 	cmp r0, #0
-	ldreq sp, =sp_idle
 	ldreq r0, =g_boot_param
-	ldrne sp, =sp_secondary
-	subne sp, sp, r0, lsl #6
 	bleq rank_main
 	blne secondary_cpu
 	b .
@@ -340,7 +339,7 @@ sp_temp:
 	.section .bss
 	.align	3
 	.type	sp_idle, #object
-	.space	1024	
+	.space	4*1024	
 sp_idle:
 	.size sp_idle, .-sp_idle
 
@@ -349,12 +348,6 @@ sp_idle:
 	.space	8	
 sp_except:
 	.size sp_except, .-sp_except
-
-	.align	3
-	.type	sp_secondary, #object
-	.space	4*64	
-sp_secondary:
-	.size sp_secondary, .-sp_secondary
 
 	.align	14
 	.type	pt1, #object

@@ -19,6 +19,6 @@ typedef struct
 extern void thread_exit(void);
 extern int idle_thread_create(thread_arg_t *);
 extern int thread_create(thread_arg_t *);
-extern void schedule(void);
+extern int schedule(void);
 #endif
 

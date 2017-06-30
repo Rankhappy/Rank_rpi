@@ -25,11 +25,11 @@ get_cpuid:
 .type spin_lock, %function
 spin_lock:
 	ldrex r1, [r0]
-	cmp r1, #1
-	beq spin_lock
-	mov r1, #1
-	strex r2, r1, [r0]
-	cmp r2, #0
+	cmp r1, #0
+	wfene
+	moveq r1, #1
+	strexeq r2, r1, [r0]
+	cmpeq r2, #0
 	bne spin_lock
 	dmb
 	mov pc, lr
@@ -45,6 +45,7 @@ spin_unlock:
 	mov r1, #0
 	str r1, [r0]
 	dmb
+	sev
 	mov pc, lr
 .size spin_unlock, .-spin_unlock
 .endfunc
@@ -131,6 +132,7 @@ get_sp:
 .type get_thread_id, %function
 get_thread_id:
 	mrc p15, 0, r0, c13, c0, 4
+	mov pc, lr
 .size get_thread_id, .-get_thread_id
 .endfunc
 
@@ -139,6 +141,7 @@ get_thread_id:
 .type set_thread_id, %function
 set_thread_id:
 	mcr p15, 0, r0, c13, c0, 4
+	mov pc, lr
 .size set_thread_id, .-set_thread_id
 .endfunc
 
@@ -148,15 +151,19 @@ set_thread_id:
 context_switch:
 	stmia r0, {r4-r14}
 	mrs r2, cpsr
-	str r2, [r0, #(4*12)]
+	str r2, [r0, #(4*11)]
 	mrc p15, 0, r2, c13, c0, 4
-	str r2, [r0, #(4*13)]
+	str r2, [r0, #(4*12)]
 	
 	ldmia r1, {r4-r14}
-	ldr r2, [r1, #(4*12)]
+	ldr r2, [r1, #(4*11)]
 	msr cpsr_cxsf, r2
-	ldr r2, [r1, #(4*13)]
+	ldr r2, [r1, #(4*12)]
 	mcr p15, 0, r2, c13, c0, 4
+
+	push {lr}
+	bl cpu_unlock
+	pop {lr}
 	
 	mov pc, lr
 .size context_switch, .-context_switch
@@ -167,6 +174,7 @@ context_switch:
 .type thread_entry, %function
 thread_entry:
 	mov r0, r5
+	ldr lr, =thread_exit
 	mov pc, r4
 .size thread_entry, .-thread_entry
 .endfunc

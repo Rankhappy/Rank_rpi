@@ -183,8 +183,7 @@ void _free_zone(zones_t *zones, zone_map_t *zone_map, frame_t *frame)
 	zone->idx = map_idx;
 	list_init(&zone->node);
 	list_add_head(&zones->free_list[order], &zone->node);
-
-	low_free(frame);
+	
 }
 
 /*TODO: add other types of physical memory.*/

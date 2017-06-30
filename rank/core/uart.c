@@ -80,7 +80,7 @@ void uart_test(void)
 }
 #endif
 
-#if 0 //for booting debug. if needed, can enable.
+#if 1 //for booting debug. if needed, can enable.
 void _print_rigister (uint32_t r)
 {
 	unsigned int rb;
@@ -105,5 +105,13 @@ void print_rigister (uint32_t r)
 	uart_putc('\r', UART0_BASE_PADDR);
 	uart_putc('\n', UART0_BASE_PADDR);
 }
+
+void vprint_rigister (uint32_t r)
+{
+	_print_rigister(r);
+	uart_putc('\r', UART0_BASE_VADDR);
+	uart_putc('\n', UART0_BASE_VADDR);
+}
+
 #endif
 
