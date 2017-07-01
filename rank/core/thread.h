@@ -11,13 +11,12 @@ typedef void (*entry_func_t)(void *);
 typedef struct
 {	
 	int prio;
-	uint32_t cpu_mask;
 	entry_func_t entry;
 	void *arg;
 }thread_arg_t;
 
 extern void thread_exit(void);
-extern int idle_thread_create(thread_arg_t *);
+extern int idle_thread_create(void);
 extern int thread_create(thread_arg_t *);
 extern int schedule(void);
 #endif

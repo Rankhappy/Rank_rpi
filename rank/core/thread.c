@@ -10,8 +10,10 @@
 #include "core.h"
 #include "thread.h"
 #include "mm.h"
+#include "assert.h"
 
 #define STACK_SIZE 1024
+#define CPU_NUM 4
 
 #define thdbg(fmt, args...) printf("[RANK][THREAD][DEBUG]"fmt, ##args)
 #define therr(fmt, args...) printf("[RANK][THREAD][ERROR]"fmt, ##args)
@@ -40,16 +42,23 @@ typedef enum
 	STAT_DEAD
 }thread_stat_t;
 
+typedef enum
+{
+	FLAG_IDLE = 0,
+	FLAG_NORMAL,
+}thread_flag_t;
+
 typedef struct
 {
 	int prio;
-	uint32_t cpu_mask;
 	thread_stat_t stat;
+	thread_flag_t flag;
 	heap_node_t node;
 	cpu_ctx_t cpu_ctx;
 }thread_t;
 
 static heap_t g_thead_heap;
+static thread_t g_idle_thread[CPU_NUM];
 
 static int thread_prio_comp(heap_node_t *n1, heap_node_t *n2)
 {
@@ -88,19 +97,17 @@ void thread_exit(void)
 	//rfree(th);
 }
 
-int idle_thread_create(thread_arg_t *thread_arg)
+int idle_thread_create(void)
 {
 	thread_t *th;
+	uint32_t cpuid = get_cpuid();
 
-	th = rmalloc(sizeof(thread_t));
-	if(th == NULL)
-	{
-		return -1;
-	}
+	th = &g_idle_thread[cpuid];
+
+	thdbg("idle_thread_create:th = 0x%08x\n", (uint32_t)th);
 	
-	th->cpu_mask = thread_arg->cpu_mask;
-	th->prio = thread_arg->prio;
 	th->stat = STAT_RUNNING;
+	th->flag = FLAG_IDLE;
 
 	set_thread_id((uint32_t)th);
 
@@ -116,8 +123,9 @@ int thread_create(thread_arg_t *thread_arg)
 	{
 		return -1;
 	}
+	
+	thdbg("thread_create:th = 0x%08x\n", (uint32_t)th);
 
-	th->cpu_mask = thread_arg->cpu_mask;
 	th->prio = thread_arg->prio;
 	th->cpu_ctx.r13 = (uint32_t)stack_alloc();
 	if(th->cpu_ctx.r13 == 0)
@@ -131,6 +139,7 @@ int thread_create(thread_arg_t *thread_arg)
 	th->cpu_ctx.r4 = (uint32_t)thread_arg->entry;
 	th->cpu_ctx.r5 = (uint32_t)thread_arg->arg;
 	th->stat = STAT_READYTORUN;
+	th->flag = FLAG_NORMAL;
 	
 	heap_node_init(&th->node);
 	heap_insert(&g_thead_heap, &th->node, thread_prio_comp);
@@ -146,32 +155,40 @@ int schedule(void)
 	uint32_t cpuid = get_cpuid();
 
 	//thdbg("schedule:cpu_id = %d\n", cpuid);
-
+	old_th = (thread_t *)get_thread_id();
+	assert(old_th->stat != STAT_READYTORUN);
+	
 next:
 	n = heap_get(&g_thead_heap);
 	if(n == NULL)
 	{
-		return -1;
+		if(old_th->flag == FLAG_IDLE)
+		{
+			return -1;
+		}
+		new_th = &g_idle_thread[cpuid];
+		assert(new_th->stat == STAT_READYTORUN);
 	}
-	new_th = heap_data(n, thread_t, node);
-	thdbg("schedule:new_th = 0x%08x, stat = %d\n", (uint32_t)new_th, new_th->stat);
-	if(new_th->stat == STAT_DEAD)
+	else
 	{
-		thdbg("schedule:remove dead thread.\n");
+		new_th = heap_data(n, thread_t, node);
+		assert(new_th->stat != STAT_RUNNING);
+		thdbg("schedule:new_th = 0x%08x, stat = %d\n", (uint32_t)new_th, new_th->stat);
+		if(new_th->stat == STAT_DEAD)
+		{
+			thdbg("schedule:remove dead thread.\n");
+			heap_delete(&g_thead_heap, thread_prio_comp);
+			rfree(new_th);
+			goto next;
+		}
 		heap_delete(&g_thead_heap, thread_prio_comp);
-		rfree(new_th);
-		goto next;
 	}
-	
-	if((new_th->cpu_mask) & (1<<cpuid))
+
+	if(old_th->flag == FLAG_NORMAL)
 	{
-		return -1;
+		heap_node_init(&old_th->node);
+		heap_insert(&g_thead_heap, &old_th->node, thread_prio_comp);
 	}
-	heap_delete(&g_thead_heap, thread_prio_comp);
-	
-	old_th = (thread_t *)get_thread_id();
-	heap_node_init(&old_th->node);
-	heap_insert(&g_thead_heap, &old_th->node, thread_prio_comp);
 
 	thdbg("schedule:new_th = 0x%08x, old_th = 0x%08x\n", (uint32_t)new_th, (uint32_t)old_th);
 	new_th->stat = STAT_RUNNING;

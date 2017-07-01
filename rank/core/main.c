@@ -12,6 +12,8 @@
 #include "thread.h"
 #include "core.h"
 
+#define CPU_NUM 4
+
 #define IO_BASE1_PADDR    0x3f200000
 #define IO_BASE1_VADDR    0xef200000
 
@@ -207,14 +209,8 @@ void cpu_unlock(void)
 
 void idle_entry(void)
 {
-	thread_arg_t arg;
-	uint32_t cpuid = get_cpuid();
-
-	arg.cpu_mask = (~(1 << cpuid)) & 0x0f;
-	arg.prio = 255;
-
 	cpu_lock();
-	idle_thread_create(&arg);
+	idle_thread_create();
 	cpu_unlock();
 
 	while(1)
@@ -330,14 +326,17 @@ int rank_main(void)
 	start_secondary_cpu(3);
 
 #if 1 //test thread
-	thread_arg_t arg;
-	arg.arg = NULL;
-	arg.cpu_mask = 0;
-	arg.entry = thread_test;
-	arg.prio = 0;
-	cpu_lock();
-	thread_create(&arg);
-	cpu_unlock();
+	int i;
+	for(i = 0; i < CPU_NUM; i++)
+	{
+		thread_arg_t arg;
+		arg.arg = NULL;
+		arg.entry = thread_test;
+		arg.prio = 0;
+		cpu_lock();
+		thread_create(&arg);
+		cpu_unlock();
+	}
 #endif
 
 	idle_entry();
