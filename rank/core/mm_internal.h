@@ -20,7 +20,7 @@
 #define FRAME_MASK (~((1<<FRAME_SHIFT)-1))
 #define FRAME_SIZE (1<<FRAME_SHIFT)
 
-#define mmdbg(fmt, args...)  printf("[RANK][MM][DEBUG]"fmt, ##args)
+#define mmdbg(fmt, args...)  //printf("[RANK][MM][DEBUG]"fmt, ##args)
 #define mmerr(fmt, args...) printf("[RANK][MM][ERROR]"fmt, ##args)
 
 

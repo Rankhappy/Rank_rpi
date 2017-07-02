@@ -5,6 +5,8 @@
 */
 
 #include "uart.h"
+#include "type.h"
+#include "core.h"
 
 #define va_start(v,l)   __builtin_va_start(v,l)
 #define va_end(v)       __builtin_va_end(v)
@@ -13,9 +15,10 @@
 
 typedef __builtin_va_list va_list;
 
-#define putchar(c) uart_putc(c, g_console_base)
+#define putchar(c) uart_putc(c, g_console_base);
 
 static uint32_t g_console_base;
+static spin_lock_t g_console_lock;
 
 static void print_char(char c)
 {
@@ -168,10 +171,15 @@ static void vprintf(const char *fmt, va_list ap)
 
 void printf(const char *fmt, ...)
 {
+	spin_lock(&g_console_lock);
+	
 	va_list ap;
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
 	va_end(ap);
+
+	spin_unlock(&g_console_lock);
+	
 }
 
 void print_init(uint32_t base)

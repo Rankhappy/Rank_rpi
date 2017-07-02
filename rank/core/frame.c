@@ -8,6 +8,7 @@
 #include "type.h"
 #include "mm.h"
 #include "mm_internal.h"
+#include "thread.h"
 
 #define FRAME_MAX_ORDER 11
 
@@ -36,6 +37,8 @@ static zone_map_t g_linear_map[LINEAR_MEM_SIZE>>FRAME_SHIFT];
 
 static zones_t *g_zones[TYPE_ZONE_SIZE];
 static zone_map_t *g_map[TYPE_ZONE_SIZE];
+
+static mutex_t g_frame_lock;
 
 static inline int frames2order(uint32_t frames)
 {
@@ -69,6 +72,7 @@ static int _zones_init(zones_t *zones, zone_map_t *zone_map)
 
 	frames = zones->frames;
 	map_idx = 0;
+	order = FRAME_MAX_ORDER;
 
 	/*Add the whole zone to the free list.*/
 	while(frames)
@@ -114,14 +118,15 @@ static frame_t *_alloc_zone(zones_t *zones, zone_map_t *zone_map, uint32_t frame
 	{
 		return NULL;
 	}
-	
+
 	frame = (frame_t *)low_malloc(sizeof(frame_t));
 	if(frame == NULL)
 	{
 		return NULL;
 	}
 	frame->frames = (1<<order);
-	mmdbg("_alloc_zone:start_pfn = %d, idx = %d\n", zones->start_pfn, zone->idx);
+	mmdbg("_alloc_zone:start_pfn = %d, idx = %d, order = %d, order_i = %d\n", \
+		zones->start_pfn, zone->idx, order, order_i);
 	frame->pfn = zones->start_pfn + zone->idx;
 	frame->type = TYPE_LINEAR_ZONE;
 
@@ -131,6 +136,7 @@ static frame_t *_alloc_zone(zones_t *zones, zone_map_t *zone_map, uint32_t frame
 		uint32_t next_idx = zone->idx + (1<<order);
 		zone_t *next_zone = &zone_map[next_idx].zone;
 		next_zone->frames = (1<<order);
+		next_zone->idx = next_idx;
 		list_init(&next_zone->node);
 		list_add_head(&zones->free_list[order], &next_zone->node);
 		order++;
@@ -183,6 +189,8 @@ void _free_zone(zones_t *zones, zone_map_t *zone_map, frame_t *frame)
 	zone->idx = map_idx;
 	list_init(&zone->node);
 	list_add_head(&zones->free_list[order], &zone->node);
+
+	mmdbg("_free_zone:start_pfn = %d, idx = %d\n", zones->start_pfn, zone->idx);
 	
 }
 
@@ -214,27 +222,41 @@ int zones_init(addr_t start, size_t size)
 		return rc;
 	}
 
+	mutex_init(&g_frame_lock);
+
 	return 0;
 }
 
 frame_t *alloc_frames(type_zone_t type, uint32_t frames)
 {
 	frame_t *frame = NULL;
+	int locked;
+
+	locked = mutex_lock(&g_frame_lock);
+	
 	zones_t *zones = g_zones[type];
 	zone_map_t *zone_map = g_map[type];
 	
 	frame = _alloc_zone(zones, zone_map, frames);
+
+	if(locked == 0)	mutex_unlock(&g_frame_lock);
 
 	return frame;
 }
 
 void free_frames(frame_t *frame)
 {
+	int locked;
+	
+	locked = mutex_lock(&g_frame_lock);
+
 	zones_t *zones = g_zones[frame->type];
 	zone_map_t *zone_map = g_map[frame->type];
 	
 	_free_zone(zones, zone_map, frame);
 
+	if(locked == 0)	mutex_unlock(&g_frame_lock);
+	
 	low_free(frame);
 }
 
@@ -243,17 +265,22 @@ void set_frame_priv(type_zone_t type, uint32_t pfn, void *data)
 	uint32_t map_idx;
 	zones_t *zones;
 	zone_map_t *zone_map;
+	int locked;
 
 	if(type >= TYPE_ZONE_SIZE)
 	{
 		return;
 	}
 
+	locked = mutex_lock(&g_frame_lock);
+	
 	zones = g_zones[type];
 	zone_map = g_map[type];
 	map_idx = pfn - zones->start_pfn;
 
 	zone_map[map_idx].priv = data;
+
+	if(locked == 0)	mutex_unlock(&g_frame_lock);
 }
 
 void *get_frame_priv(type_zone_t type, uint32_t pfn)
@@ -261,16 +288,24 @@ void *get_frame_priv(type_zone_t type, uint32_t pfn)
 	uint32_t map_idx;
 	zones_t *zones;
 	zone_map_t *zone_map;
+	void *rc;
+	int locked;
 	
 	if(type >= TYPE_ZONE_SIZE)
 	{
 		return NULL;
 	}
 
+	locked = mutex_lock(&g_frame_lock);
+
 	zones = g_zones[type];
 	zone_map = g_map[type];
 	map_idx = pfn - zones->start_pfn;
 
-	return zone_map[map_idx].priv;
+	rc = zone_map[map_idx].priv;
+
+	if(locked == 0)	mutex_unlock(&g_frame_lock);
+
+	return rc;
 }
 

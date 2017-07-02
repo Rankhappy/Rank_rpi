@@ -132,6 +132,8 @@ get_sp:
 .type get_thread_id, %function
 get_thread_id:
 	mrc p15, 0, r0, c13, c0, 4
+	dsb
+	isb
 	mov pc, lr
 .size get_thread_id, .-get_thread_id
 .endfunc
@@ -141,6 +143,8 @@ get_thread_id:
 .type set_thread_id, %function
 set_thread_id:
 	mcr p15, 0, r0, c13, c0, 4
+	dsb
+	isb
 	mov pc, lr
 .size set_thread_id, .-set_thread_id
 .endfunc
@@ -160,10 +164,6 @@ context_switch:
 	msr cpsr_cxsf, r2
 	ldr r2, [r1, #(4*12)]
 	mcr p15, 0, r2, c13, c0, 4
-
-	push {lr}
-	bl cpu_unlock
-	pop {lr}
 	
 	mov pc, lr
 .size context_switch, .-context_switch

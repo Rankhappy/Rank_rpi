@@ -6,8 +6,10 @@
 
 #include "list.h"
 #include "type.h"
+#include "core.h"
 #include "mm.h"
 #include "mm_internal.h"
+#include "thread.h"
 
 #define LOW_MAX_ORDER 5
 #define LOW_SIZE_SHIFT 4
@@ -24,6 +26,7 @@ typedef struct
 static list_t g_free_list[LOW_MAX_ORDER+1];
 static addr_t g_low_base;
 static size_t g_low_size;
+static mutex_t g_low_lock;
 
 int low_area_init(addr_t start, size_t size)
 {
@@ -58,6 +61,8 @@ int low_area_init(addr_t start, size_t size)
 	chunk->size = 1<<LOW_SIZE_SHIFT;
 	chunk->flag = FLAG_ALLOC_BIT | (g_low_size - (2<<LOW_SIZE_SHIFT));
 
+	mutex_init(&g_low_lock);
+
 	return 0;
 }
 
@@ -66,6 +71,7 @@ void *low_malloc(size_t size)
 	int order, i;
 	chunk_t *chunk;
 	int chunk_ok = 0;
+	int locked;
 
 	size += CHUNK_RESERVE_SIZE;
 	size = allign_up(size, LOW_SIZE_SHIFT);
@@ -76,6 +82,8 @@ void *low_malloc(size_t size)
 	}
 
 	order = size2order(size, LOW_MAX_ORDER, LOW_SIZE_SHIFT);
+
+	locked = mutex_lock(&g_low_lock);
 
 	for(i = order; i <= LOW_MAX_ORDER; i++)
 	{
@@ -105,6 +113,7 @@ void *low_malloc(size_t size)
 
 	if(i > LOW_MAX_ORDER)
 	{
+		if(locked == 0)	mutex_unlock(&g_low_lock);
 		return NULL;
 	}
 
@@ -125,6 +134,8 @@ void *low_malloc(size_t size)
 		}
 	}
 
+	if(locked == 0)	mutex_unlock(&g_low_lock);
+	
 	return (void *)((addr_t)chunk+CHUNK_RESERVE_SIZE);
 }
 
@@ -132,6 +143,9 @@ void low_free(void *addr)
 {
 	int order;
 	chunk_t *chunk, *next_chunk, *pre_chunk;
+	int locked;
+
+	locked = mutex_lock(&g_low_lock);
 
 	chunk = (chunk_t *)((addr_t)addr-CHUNK_RESERVE_SIZE);
 	next_chunk = (chunk_t *)((addr_t)chunk+chunk->size);
@@ -166,6 +180,8 @@ void low_free(void *addr)
 	list_init(&chunk->node);
 	order = size2order(chunk->size, LOW_MAX_ORDER, LOW_SIZE_SHIFT);
 	list_add_head(&g_free_list[order], &chunk->node);
+
+	if(locked == 0)	mutex_unlock(&g_low_lock);
 }
 
 

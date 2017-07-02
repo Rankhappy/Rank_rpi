@@ -209,43 +209,53 @@ void cpu_unlock(void)
 
 void idle_entry(void)
 {
-	cpu_lock();
-	idle_thread_create();
-	cpu_unlock();
+	//cpu_lock();
+	//idle_thread_create();
+	//cpu_unlock();
 
 	while(1)
 	{
-		cpu_lock();
+		//cpu_lock();
 		/*if return 0, we unlock at the other point.*/
-		if(schedule() == -1)
-		{
-			cpu_unlock();
-		}
+		//if(schedule() == -1)
+		//{
+			//cpu_unlock();
+		//}
+		schedule();
 	}
 }
  
 void secondary_cpu(void)
 {
-	cpu_lock();
+	//cpu_lock();
 
 	uint32_t cpuid = get_cpuid();
 
 	rdbg("secondary_cpu:i am cpu#%d.\n", cpuid);
 
-	cpu_unlock();
+	idle_thread_create();
+	//cpu_unlock();
 	idle_entry();
 }
 
 #if 1 //thread test
 void thread_test(void *arg)
 {
-	cpu_lock();
+	//cpu_lock();
 	
+	uint32_t *p;
 	uint32_t cpuid = get_cpuid();
 	
 	rdbg("thread_test:i am cpu#%d.\n", cpuid);
+
+	p = (uint32_t *)rmalloc(sizeof(uint32_t)*20);
+	*p = 0;
+	*(p+19) = 0;
+	rdbg("[cpu#%d]rmalloc test ok!\n", cpuid);
+	rfree(p);
+	rdbg("[cpu#%d]rfree test ok!\n", cpuid);
 	
-	cpu_unlock();
+	//cpu_unlock();
 }
 #endif
 extern void start_secondary_cpu(uint32_t);
@@ -320,6 +330,7 @@ int rank_main(void)
 	rfree(p);
 	rdbg("rfree test ok!\n");
 #endif
+	idle_thread_create();
 
 	start_secondary_cpu(1);
 	start_secondary_cpu(2);
@@ -333,9 +344,9 @@ int rank_main(void)
 		arg.arg = NULL;
 		arg.entry = thread_test;
 		arg.prio = 0;
-		cpu_lock();
+		//cpu_lock();
 		thread_create(&arg);
-		cpu_unlock();
+		//cpu_unlock();
 	}
 #endif
 

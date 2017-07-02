@@ -8,6 +8,7 @@
 #include "type.h"
 #include "mm.h"
 #include "mm_internal.h"
+#include "thread.h"
 
 #define RMALLOC_MAX_ORDER 5
 #define RMALLOC_SIZE_SHIFT 4
@@ -20,6 +21,8 @@ typedef struct
 	uint32_t objects;
 	list_t partial_list;
 	list_t full_list;
+	mutex_t lock;
+	//spin_lock_t lock;
 }slabs_t;
 
 typedef struct
@@ -44,6 +47,9 @@ static int slab_init(slabs_t *slabs, int obj_size, uint32_t frames)
 	list_init(&slabs->partial_list);
 	list_init(&slabs->full_list);
 
+	mutex_init(&slabs->lock);
+	//slabs->lock = 0;
+
 	return 0;
 }
 
@@ -51,8 +57,12 @@ static void *slab_alloc(slabs_t *slabs)
 {
 	void *obj;
 	slab_t *slab;
+	int locked;
 
 	mmdbg("slab_alloc:obj_size = 0x%x, objects = %d.\n", slabs->obj_size, slabs->objects);
+
+	locked = mutex_lock(&slabs->lock);
+	//spin_lock(&slabs->lock);
 	
 	if(!list_empty(&slabs->partial_list))
 	{
@@ -68,11 +78,15 @@ static void *slab_alloc(slabs_t *slabs)
 		frame = alloc_frames(TYPE_LINEAR_ZONE, slabs->frames);
 		if(frame == NULL)
 		{
+			if(locked == 0)	mutex_unlock(&slabs->lock);
+			//spin_unlock(&slabs->lock);
 			return NULL;
 		}
 		slab = low_malloc(sizeof(slab_t));
 		if(slab == NULL)
 		{
+			if(locked == 0)	mutex_unlock(&slabs->lock);
+			//spin_unlock(&slabs->lock);
 			return NULL;
 		}
 		slab->frame = frame;
@@ -97,9 +111,11 @@ static void *slab_alloc(slabs_t *slabs)
 		list_init(&slab->node);
 		list_add_head(&slabs->partial_list, &slab->node);
 	}
-	
+
+	mmdbg("slab_alloc:obj_head@1 = 0x%08x.\n", slab->obj_head);
 	obj = (void *)((addr_t)(slab->base) + slab->obj_head*slabs->obj_size);
 	slab->obj_head = *(uint32_t *)obj;
+	mmdbg("slab_alloc:obj_head@2 = 0x%08x.\n", slab->obj_head);
 	slab->availables--;
 	if(slab->availables == 0)
 	{	
@@ -108,6 +124,9 @@ static void *slab_alloc(slabs_t *slabs)
 		list_add_head(&slabs->full_list, &slab->node);
 	}
 
+	if(locked == 0)	mutex_unlock(&slabs->lock);
+	//spin_unlock(&slabs->lock);
+	
 	return obj;
 }
 
@@ -125,15 +144,22 @@ static void slab_free(void *obj)
 	slabs_t *slabs;;
 	slab_t *slab;
 	uint32_t idx;
+	int locked;
 
 	/*Should add type as the function's input parameter rather than fixed here?*/
 	slab = get_slab_byobj(TYPE_LINEAR_ZONE, obj);
 	mmdbg("slab_free:slab = 0x%08x.\n", (uint32_t)slab);
 	slabs = slab->slabs;
+
+	locked = mutex_lock(&slabs->lock);
+	//spin_lock(&slabs->lock);
+	
 	idx = ((addr_t)obj-(addr_t)(slab->base))/slabs->obj_size;
 
+	mmdbg("slab_free:obj_head@1 = 0x%08x.\n", slab->obj_head);
 	*(uint32_t *)obj = slab->obj_head;
 	slab->obj_head = idx;
+	mmdbg("slab_free:obj_head@2 = 0x%08x.\n", slab->obj_head);
 	slab->availables++;
 
 	/*Move slab from full list to partial list.*/
@@ -150,6 +176,9 @@ static void slab_free(void *obj)
 		free_frames(slab->frame);
 		low_free(slab);
 	}
+
+	if(locked == 0)	mutex_unlock(&slabs->lock);
+	//spin_unlock(&slabs->lock);
 }
 
 int rmalloc_slab_init(void)
