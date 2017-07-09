@@ -46,5 +46,7 @@ extern void mutex_init(mutex_t *);
 extern int mutex_lock(mutex_t *);
 extern void mutex_unlock(mutex_t *);
 
+extern void schedule_timeout(uint32_t);
+
 #endif
 

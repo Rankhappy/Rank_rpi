@@ -127,6 +127,37 @@ get_sp:
 .size get_sp, .-get_sp
 .endfunc
 
+.global enable_local_irq
+.func enable_local_irq
+.type enable_local_irq, %function
+enable_local_irq:
+	mrs r0, cpsr
+	bic r0, r0, #0x80
+	msr cpsr_c, r0
+	mov pc, lr
+.size enable_local_irq, .-enable_local_irq
+.endfunc
+
+.global restore_local_irq
+.func restore_local_irq
+.type restore_local_irq, %function
+restore_local_irq:
+	msr cpsr_c, r0
+	mov pc, lr
+.size restore_local_irq, .-restore_local_irq
+.endfunc
+
+.global disable_local_irq
+.func disable_local_irq
+.type disable_local_irq, %function
+disable_local_irq:
+	mrs r0, cpsr
+	orr r1, r0, #0x80
+	msr cpsr_c, r1
+	mov pc, lr
+.size disable_local_irq, .-disable_local_irq
+.endfunc
+
 .global get_thread_id
 .func get_thread_id
 .type get_thread_id, %function

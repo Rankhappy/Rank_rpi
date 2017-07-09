@@ -23,7 +23,7 @@ __start:
 	b	.							/* Prefetch abort */
 	b	data_abort_handle			/* Data abort */
 	b	.							/* Reserved */
-	b	.							/* IRQ */
+	b	irq_handle					/* IRQ */
 	b	.							/* FIQ */
 	
 .size	__start, .-__start
@@ -318,6 +318,42 @@ data_abort_handle:
 	b . //stop as now.
 	ldmia r0, {r1-r15}^
 .size data_abort_handle, .-data_abort_handle
+.endfunc
+	
+.func irq_handle
+.type irq_handle, %function
+irq_handle:
+	ldr sp, =sp_except
+	sub lr, lr, #4
+	str lr, [sp]
+	mrs lr, spsr
+	str lr, [sp, #4]
+
+	bic lr, lr, #(PSR_MODE_MASK)
+	orr lr, lr, #(PSR_MODE_SVC | PSR_I_BIT | PSR_F_BIT)
+	msr cpsr_c, lr
+
+	sub sp, sp, #(4*17) //r0~r14, abt_r14(pc), abt_spsr(cpsr)
+	stmia sp, {r0-r12}
+
+	ldr r0, =sp_except
+	ldmia r0, {r3, r4}
+
+	add r1, sp, #(4*17)
+	mov r2, lr
+	add r0, sp, #(4*13)
+	stmia r0, {r1-r4}
+
+	mov fp, #0
+	mov r0, sp
+	mov r4, sp
+	bic sp, sp, #7
+	bl irq_dispatch
+	mov r0, r4
+	ldr r1, [r0, #(4*16)]
+	msr spsr_cxsf, r1
+	ldmia r0, {r0-r15}^
+.size irq_handle, .-irq_handle
 .endfunc
 
 	.align	2

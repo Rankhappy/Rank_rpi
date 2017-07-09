@@ -11,7 +11,7 @@
 #include "thread.h"
 #include "mm.h"
 #include "assert.h"
-//#include "atomic.h"
+#include "sys_timer.h"
 
 #define STACK_SIZE 1024
 #define CPU_NUM 4
@@ -60,6 +60,7 @@ typedef struct
 	thread_flag_t flag;
 	heap_node_t rnode;
 	list_node_t wnode;
+	timer_entity_t te;
 	cpu_ctx_t cpu_ctx;
 }thread_t;
 
@@ -124,12 +125,15 @@ int idle_thread_create(void)
 	
 	set_thread_id((uint32_t)th);
 
+	enable_local_irq();
+
 	return 0;
 }
 
 int thread_create(thread_arg_t *thread_arg)
 {
 	thread_t *th;
+	uint32_t flag;
 
 	th = rmalloc(sizeof(thread_t));
 	if(th == NULL)
@@ -147,17 +151,18 @@ int thread_create(thread_arg_t *thread_arg)
 	}
 	th->cpu_ctx.r13 += STACK_SIZE;
 	th->cpu_ctx.r14 = (uint32_t)thread_entry;
-	th->cpu_ctx.cpsr = PSR_MODE_SVC | PSR_I_BIT | PSR_F_BIT | PSR_A_BIT;
+	th->cpu_ctx.cpsr = PSR_MODE_SVC | PSR_F_BIT | PSR_A_BIT; //enable irq
 	th->cpu_ctx.tpidrprw = (uint32_t)th;
 	th->cpu_ctx.r4 = (uint32_t)thread_arg->entry;
 	th->cpu_ctx.r5 = (uint32_t)thread_arg->arg;
 	th->stat = STAT_READYTORUN;
 	th->flag = FLAG_NORMAL;
 	heap_node_init(&th->rnode);
+	init_timer_entity(&th->te);
 
-	spin_lock(&g_heap_lock);
+	spin_lock_irqsave(&g_heap_lock, &flag);
 	heap_insert(&g_thead_heap, &th->rnode, thread_prio_comp);
-	spin_unlock(&g_heap_lock);
+	spin_unlock_irqrestore(&g_heap_lock, flag);
 
 	return 0;
 }
@@ -167,6 +172,7 @@ int schedule(void)
 	thread_t *old_th;
 	thread_t *new_th;
 	heap_node_t *n;
+	uint32_t flag;
 	uint32_t cpuid = get_cpuid();
 
 	//thdbg("schedule:cpu_id = %d\n", cpuid);
@@ -174,11 +180,11 @@ int schedule(void)
 	assert(old_th->stat != STAT_READYTORUN);
 
 next:
-	spin_lock(&g_heap_lock);
+	spin_lock_irqsave(&g_heap_lock, &flag);
 	n = heap_get(&g_thead_heap);
 	if(n == NULL)
 	{
-		spin_unlock(&g_heap_lock);
+		spin_unlock_irqrestore(&g_heap_lock, flag);
 		if(old_th->flag == FLAG_IDLE)
 		{
 			return -1;
@@ -189,7 +195,7 @@ next:
 	else
 	{
 		heap_delete(&g_thead_heap, thread_prio_comp);
-		spin_unlock(&g_heap_lock);
+		spin_unlock_irqrestore(&g_heap_lock, flag);
 		new_th = heap_data(n, thread_t, rnode);
 		assert(new_th->stat != STAT_RUNNING);
 		thdbg("schedule:new_th = 0x%08x, stat = %d\n", (uint32_t)new_th, new_th->stat);
@@ -204,9 +210,9 @@ next:
 	if((old_th->flag == FLAG_NORMAL) && (old_th->stat != STAT_SLEEP))
 	{
 		heap_node_init(&old_th->rnode);
-		spin_lock(&g_heap_lock);
+		spin_lock_irqsave(&g_heap_lock, &flag);
 		heap_insert(&g_thead_heap, &old_th->rnode, thread_prio_comp);
-		spin_unlock(&g_heap_lock);
+		spin_unlock_irqrestore(&g_heap_lock, flag);
 	}
 
 	thdbg("schedule:new_th = 0x%08x, old_th = 0x%08x\n", (uint32_t)new_th, (uint32_t)old_th);
@@ -220,6 +226,46 @@ next:
 	context_switch((uint32_t)&old_th->cpu_ctx, (uint32_t)&new_th->cpu_ctx);
 
 	return 0;
+}
+
+/*interrupt handle*/
+static void thread_timeout_handle(void *arg)
+{
+	thread_t *th;
+
+	th = (thread_t *)arg;
+
+	assert(th);
+	assert(th->stat == STAT_SLEEP);
+
+	th->stat = STAT_READYTORUN;
+	heap_node_init(&th->rnode);
+	spin_lock(&g_heap_lock);
+	heap_insert(&g_thead_heap, &th->rnode, thread_prio_comp);
+	spin_unlock(&g_heap_lock);
+}
+
+void schedule_timeout(uint32_t m_sec)
+{
+	thread_t *cur_th;
+	
+	cur_th = (thread_t *)get_thread_id();
+	
+	assert(cur_th->stat == STAT_RUNNING);
+	
+	if(cur_th->flag == FLAG_IDLE)
+	{
+		return;
+	}
+
+	cur_th->stat = STAT_SLEEP;
+	
+	cur_th->te.timeout = m_sec;
+	cur_th->te.handle = thread_timeout_handle;
+	cur_th->te.arg = (void *)cur_th;
+	sys_timer_add(&cur_th->te);
+
+	schedule();
 }
 
 void waitq_init(waitq_t *wq)
@@ -261,6 +307,7 @@ void wake_up(waitq_t *wq)
 {
 	list_node_t *wait_node;
 	thread_t *th;
+	uint32_t flag;
 	
 	spin_lock(&wq->lock);
 	
@@ -271,9 +318,9 @@ void wake_up(waitq_t *wq)
 		assert(th->stat == STAT_SLEEP);
 		th->stat = STAT_READYTORUN;
 		heap_node_init(&th->rnode);
-		spin_lock(&g_heap_lock);
+		spin_lock_irqsave(&g_heap_lock, &flag);
 		heap_insert(&g_thead_heap, &th->rnode, thread_prio_comp);
-		spin_unlock(&g_heap_lock);
+		spin_unlock_irqrestore(&g_heap_lock, flag);
 	}
 	list_init(&wq->list);
 	
@@ -306,6 +353,7 @@ int mutex_lock(mutex_t *mux)
 		{
 			if(mux->owner == get_thread_id())
 			{
+				spin_unlock(&mux->lock);
 				return 1;
 			}
 		}

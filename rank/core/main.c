@@ -11,14 +11,10 @@
 #include "mm.h"
 #include "thread.h"
 #include "core.h"
-
-#define CPU_NUM 4
-
-#define IO_BASE1_PADDR    0x3f200000
-#define IO_BASE1_VADDR    0xef200000
-
-#define IO_BASE2_PADDR    0x40000000
-#define IO_BASE2_VADDR    0xf0000000
+#include "board.h"
+#include "timer.h"
+#include "irq.h"
+#include "sys_timer.h"
 
 #define MEMORY_NOMAL(flag)\
 { \
@@ -112,22 +108,38 @@ static addr_t alloc_pt2_low(int blocks)
 static int do_io_map(void)
 {
 	int ret;
+	int i;
 
 	mmu_flag_t flag;
 
 	MEMORY_DEVICE(flag);
 
-	addr_t vaddr = IO_BASE1_VADDR;
-	addr_t paddr = IO_BASE1_PADDR;
-	ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
-	if(ret < 0)
+	addr_t vaddr = GPU_IO_VADDR;
+	addr_t paddr = GPU_IO_PADDR;
+	
+	for(i = 0; i < GPU_IO_SECTIONS; i++)
 	{
-		return ret;
+		ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
+		if(ret < 0)
+		{
+			return ret;
+		}
+		vaddr += SECTION_SIZE;
+		paddr += SECTION_SIZE;
 	}
 
-	vaddr = IO_BASE2_VADDR;
-	paddr = IO_BASE2_PADDR;
-	ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
+	vaddr = LOCAL_IO_VADDR;
+	paddr = LOCAL_IO_PADDR;
+	for(i = 0; i < LOCAL_IO_SECTIONS; i++)
+	{
+		ret = do_mmu_map(vaddr, paddr, SECTION_SIZE, flag, alloc_pt2_low);
+		if(ret < 0)
+		{
+			return ret;
+		}
+		vaddr += SECTION_SIZE;
+		paddr += SECTION_SIZE;
+	}
 
 	return ret;
 }
@@ -254,12 +266,15 @@ void thread_test(void *arg)
 	rdbg("[cpu#%d]rmalloc test ok!\n", cpuid);
 	rfree(p);
 	rdbg("[cpu#%d]rfree test ok!\n", cpuid);
+
+	schedule_timeout(3000);
+
+	rdbg("[cpu#%d]thread test exit!\n", cpuid);
 	
 	//cpu_unlock();
 }
 #endif
 extern void start_secondary_cpu(uint32_t);
-
 /*
 * Main function.
 */
@@ -330,6 +345,11 @@ int rank_main(void)
 	rfree(p);
 	rdbg("rfree test ok!\n");
 #endif
+
+	irq_init();
+	timer_init();
+	sys_timer_init();
+
 	idle_thread_create();
 
 	start_secondary_cpu(1);
@@ -351,7 +371,7 @@ int rank_main(void)
 #endif
 
 	idle_entry();
-	
+
 	return 0;
 }
 

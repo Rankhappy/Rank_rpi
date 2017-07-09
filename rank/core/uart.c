@@ -10,18 +10,7 @@
 
 #include "uart.h"
 #include "type.h"
-
-#define GPFSEL1 0x3f200004
-
-static inline void writel(uint32_t val, uint32_t addr)
-{
-	*(volatile uint32_t *)addr = val;
-}
-
-static inline uint32_t readl(uint32_t addr)
-{
-	return *(volatile uint32_t *)addr;
-}
+#include "board.h"
 
 void uart_flush(uint32_t base)
 {
@@ -80,7 +69,7 @@ void uart_test(void)
 }
 #endif
 
-#if 1 //for booting debug. if needed, can enable.
+#if 0 //for booting debug. if needed, can enable.
 void _print_rigister (uint32_t r)
 {
 	unsigned int rb;
