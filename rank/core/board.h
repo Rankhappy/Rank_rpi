@@ -90,8 +90,16 @@
 #define IRQ_DISABLE2       0x220 /*IRQ GPU 32-63 disable*/
 #define IRQ_BASIC_DISABLE  0x224 /*IRQ basic disable*/
 
-#define GPU_TIMER_IRQ 1
-#define GPU_TIMER_CHANNELS 4
+#define GPU_TIMER_IRQ 0
+
+enum
+{
+	TIMER_CHANNEL0 = 0,
+	TIMER_CHANNEL1,
+	TIMER_CHANNEL2,
+	TIMER_CHANNEL3,
+	GPU_TIMER_CHANNELS
+};
 
 #define GPFSEL1 0x3f200004
 

@@ -250,6 +250,21 @@ void secondary_cpu(void)
 	idle_entry();
 }
 
+#if 0
+void timer_irq_test(void)
+{
+	uint32_t c;
+	
+	c = readl(GPU_TIMER_BASE + GPU_TIMER_CLO);
+	c += 0x80000;
+	writel(c, GPU_TIMER_BASE + GPU_TIMER_C1);
+	writel(2, GPU_TIMER_BASE + GPU_TIMER_CS);
+	writel(0, INTERRUPT_BASE + FIQ_CONTROL);
+	writel(2, INTERRUPT_BASE + IRQ_ENABLE1);
+	enable_local_irq();
+}
+#endif
+
 #if 1 //thread test
 void thread_test(void *arg)
 {
@@ -346,8 +361,12 @@ int rank_main(void)
 	rdbg("rfree test ok!\n");
 #endif
 
+#if 0
+	timer_irq_test();
+#endif
+
 	irq_init();
-	timer_init();
+	timer_init(TIMER_CHANNEL1);
 	sys_timer_init();
 
 	idle_thread_create();

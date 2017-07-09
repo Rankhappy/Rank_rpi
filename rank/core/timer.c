@@ -9,8 +9,11 @@
 #include "irq.h"
 #include "timer.h"
 
-#define TIMNE_MS (1000)
+extern void printf(const char *fmt, ...);
 
+#define tmdbg(fmt, args...) printf("[RANK][TIMER][DEBUG]"fmt, ##args)
+#define tmerr(fmt, args...) printf("[RANK][TIMER][ERROR]"fmt, ##args)
+	
 typedef struct
 {
 	timeout_handle_t handle;
@@ -22,42 +25,44 @@ static spin_lock_t g_timer_lock;
 
 static inline uint32_t get_channel(uint32_t cs)
 {
-	uint32_t channel;
+	uint32_t channle = 0;
 	
 	while((cs&1) == 0)
 	{
-		channel++;
+		channle++;
 		cs >>= 1;
 	}
 
-	return channel;
+	return channle;
 }
 
-int set_timer(uint32_t m_sec, timeout_handle_t handle, void *arg, int channel)
+int set_timer(uint32_t interval, timeout_handle_t handle, void *arg, int channle)
 {
-	uint32_t interval;
 	uint32_t counter;
 	uint32_t flag;
 
-	if(channel < 0 || channel > 3)
+	tmdbg("set timer interval = %d, channle = %d\n", interval, channle);
+
+	if(channle < 0 || channle > 3)
 	{
+		tmerr("channle is error, channle = %d.\n", channle);
 		return -1;
 	}
 
 	if(handle == NULL)
 	{
+		tmerr("handle is null.\n");
 		return -1;
 	}
 
 	spin_lock_irqsave(&g_timer_lock, &flag);
-	g_timer[channel].handle = handle;
-	g_timer[channel].arg = arg;
+	g_timer[channle].handle = handle;
+	g_timer[channle].arg = arg;
 	spin_unlock_irqrestore(&g_timer_lock, flag);
 	
-	interval = m_sec * TIMNE_MS;
 	counter = readl(GPU_TIMER_BASE + GPU_TIMER_CLO);
 	counter += interval;
-	writel(counter, GPU_TIMER_BASE + GPU_TIMER_C0 + (channel << 2));
+	writel(counter, GPU_TIMER_BASE + GPU_TIMER_C0 + (channle << 2));
 
 	return 0;
 }
@@ -88,42 +93,52 @@ uint32_t get_timer_lcounter(void)
 	return counter;
 }
 
-void enable_timer_irq(void)
+void enable_timer_irq(int channle)
 {
-	uint32_t v; 
-	
-	v = readl(INTERRUPT_BASE + IRQ_ENABLE1);
-	writel(v | 2, INTERRUPT_BASE + IRQ_ENABLE1);
+	tmdbg("enable_timer_irq.\n");
+
+	enable_irq(GPU_TIMER_IRQ + channle);
 }
 
-void disable_timer_irq(void)
-{	
-	uint32_t v; 
-	
-	v = readl(INTERRUPT_BASE + IRQ_ENABLE1);
-	writel(v & ~2, INTERRUPT_BASE + IRQ_ENABLE1);
+void disable_timer_irq(int channle)
+{
+	tmdbg("disable_timer_irq.\n");
+
+	writel(1 << channle, GPU_TIMER_BASE + GPU_TIMER_CS);
+	disable_irq(GPU_TIMER_IRQ + channle);
 }
 
 /*interrupt handle*/
 static void timer_irq_handle(void)
 {
-	uint32_t channel;
+	uint32_t channle;
 	uint32_t cs;
 	timer_t *timer;
 	timeout_handle_t handle;
 
+	tmdbg("timer_irq_handle.\n");
+	
 	cs = readl(GPU_TIMER_BASE + GPU_TIMER_CS);
 	if(cs == 0)
 	{
+		tmdbg("no timer irq pending.\n");
 		return;
 	}
+
+	tmdbg("cs = 0x%08x.\n", cs);
+
+	writel(cs, GPU_TIMER_BASE + GPU_TIMER_CS);
 	
-	channel = get_channel(cs);
+	channle = get_channel(cs);
+
+	tmdbg("channle = %d.\n", channle);
 	
 	spin_lock(&g_timer_lock);
-	timer = &g_timer[channel];
+	timer = &g_timer[channle];
 	handle = timer->handle;
-	spin_lock(&g_timer_lock);
+	spin_unlock(&g_timer_lock);
+
+	tmdbg("handle = 0x%08x.\n", handle);
 	
 	if(handle)
 	{
@@ -131,20 +146,13 @@ static void timer_irq_handle(void)
 	}
 }
 
-void timer_init(void)
+void timer_init(int channle)
 {
-	int i;
+	disable_timer_irq(channle);
+	writel(0, GPU_TIMER_BASE + GPU_TIMER_C0 + (channle << 2));
+	writel(1<<channle, GPU_TIMER_BASE + GPU_TIMER_CS);
 
-	disable_timer_irq();
-
-	set_timer_counter(0);
-	for(i = 0; i < GPU_TIMER_CHANNELS; i++)
-	{
-		writel(0, GPU_TIMER_BASE + GPU_TIMER_C0 + (i << 2));
-	}
-	writel(0xf, GPU_TIMER_BASE + GPU_TIMER_CS);
-
-	irq_register(GPU_TIMER_IRQ, timer_irq_handle);
+	irq_register(GPU_TIMER_IRQ + channle, timer_irq_handle);
 
 	g_timer_lock = 0;
 }

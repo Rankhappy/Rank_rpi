@@ -171,14 +171,16 @@ static void vprintf(const char *fmt, va_list ap)
 
 void printf(const char *fmt, ...)
 {
-	spin_lock(&g_console_lock);
+	uint32_t flag;
+
+	spin_lock_irqsave(&g_console_lock, &flag);
 	
 	va_list ap;
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
 	va_end(ap);
 
-	spin_unlock(&g_console_lock);
+	spin_unlock_irqrestore(&g_console_lock, flag);
 	
 }
 

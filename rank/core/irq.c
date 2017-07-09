@@ -9,6 +9,9 @@
 #include "board.h"
 #include "irq.h"
 
+#define irqdbg(fmt, args...) printf("[RANK][IRQ][DEBUG]"fmt, ##args)
+#define irqerr(fmt, args...) printf("[RANK][IRQ][ERROR]"fmt, ##args)
+
 typedef struct
 {
 	int irq_num;
@@ -36,6 +39,69 @@ void irq_init(void)
 {
 	list_init(&g_irq_list);
 	g_irq_lock = 0;
+
+#if 0
+	writel(0, INTERRUPT_BASE + FIQ_CONTROL); //disalbe fiq
+	/*disable all of the irqs.*/
+	writel(0, INTERRUPT_BASE + IRQ_ENABLE1);
+	writel(0, INTERRUPT_BASE + IRQ_ENABLE2);
+	writel(0, INTERRUPT_BASE + IRQ_BASIC_ENABLE);
+#endif
+
+}
+
+void enable_irq(int irq_no)
+{
+	uint32_t v; 
+
+	irqdbg("enable_irq, irq_no = %d.\n", irq_no);
+
+	if((irq_no >= 0) && (irq_no <= 31))
+	{
+		v = readl(INTERRUPT_BASE + IRQ_ENABLE1);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_ENABLE1);
+	}
+	else if((irq_no >= 32) && (irq_no <= 63))
+	{
+		irq_no -= 32;
+		v = readl(INTERRUPT_BASE + IRQ_ENABLE2);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_ENABLE2);
+	}
+	else if((irq_no >= 64) && (irq_no <= 71))
+	{
+		irq_no -= 64;
+		v = readl(INTERRUPT_BASE + IRQ_BASIC_ENABLE);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_BASIC_ENABLE);
+	}
+	else
+	{
+		irqerr("Wrong irq no, irq_no = %d.\n", irq_no);
+	}
+}
+
+void disable_irq(int irq_no)
+{
+	uint32_t v; 
+
+	irqdbg("disable_irq, irq_no = %d.\n", irq_no);
+
+	if((irq_no >= 0) && (irq_no <= 31))
+	{
+		v = readl(INTERRUPT_BASE + IRQ_DISABLE1);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_DISABLE1);
+	}
+	else if((irq_no >= 32) && (irq_no <= 63))
+	{
+		irq_no -= 32;
+		v = readl(INTERRUPT_BASE + IRQ_DISABLE2);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_DISABLE2);
+	}
+	else if((irq_no >= 64) && (irq_no <= 71))
+	{
+		irq_no -= 64;
+		v = readl(INTERRUPT_BASE + IRQ_BASIC_DISABLE);
+		writel(v | (1<<irq_no), INTERRUPT_BASE + IRQ_BASIC_DISABLE);
+	}
 }
 
 int irq_register(int irq_num, irq_handle_t handle)
@@ -65,6 +131,8 @@ void irq_dispatch(void)
 	int irq_num;
 	irq_t *irq;
 	list_node_t *irq_node;
+
+	irqdbg("irq_dispatch.\n");
 
 	pending = readl(INTERRUPT_BASE + IRQ_PENDING1);
 	while(pending)

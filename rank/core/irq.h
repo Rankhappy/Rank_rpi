@@ -11,7 +11,9 @@
 
 typedef void (*irq_handle_t)(void);
 
-void irq_init(void);
+extern void irq_init(void);
+extern void enable_irq(int);
+extern void disable_irq(int);
 extern int irq_register(int, irq_handle_t);
 extern void irq_dispatch(void);
 
