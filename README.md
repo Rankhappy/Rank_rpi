@@ -11,8 +11,8 @@ Done
     -System Timer
    
     -Muti-Core and Muti-Thread
-    
-    -Lock
+    
+    -Lock
     
       .Spinlock
       
