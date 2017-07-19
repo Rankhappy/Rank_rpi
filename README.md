@@ -18,7 +18,7 @@ Done
       
       .Mutex
     
-    -Mermory mangement
+    -Mermory mangement
   
       .MMU
     
