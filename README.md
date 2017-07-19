@@ -4,25 +4,25 @@ DIY on Raspberry Pi 3b
 
 Done
 
-  -Booting
+    -Booting
   
-  -Interrupt
-  
-  -System Timer
-  
-  -Muti-Core and Muti-Thread
-  
-  -Mermory mangement
-  
-    .MMU
+    -Interrupt
     
-    .Frame
+    -System Timer
+   
+    -Muti-Core and Muti-Thread
+  
+    -Mermory mangement
+  
+      .MMU
     
-    .Low memory
+      .Frame
     
-    .Slab
+      .Low memory
     
-    .Vmalloc(latest add and have not verified)
+      .Slab
+    
+      .Vmalloc(latest add and have not verified)
     
   -console debug
   
