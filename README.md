@@ -11,16 +11,22 @@ Done
     -System Timer
    
     -Muti-Core and Muti-Thread
-  
-    -Mermory mangement
+    
+    -Lock
+    
+      .Spinlock
+      
+      .Mutex
+    
+    -Mermory mangement
   
       .MMU
     
-      .Frame
+      .Page alloc
     
-      .Low memory
+      .Low malloc
     
-      .Slab
+      .Rmalloc
     
       .Vmalloc(latest add and have not verified)
     
