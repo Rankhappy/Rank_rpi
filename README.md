@@ -24,38 +24,39 @@ Done
     
       .Vmalloc(latest add and have not verified)
     
-  -console debug
+    -console debug
   
-    .Uart
+        .Uart
     
-    .Printf
+        .Printf
     
-    .Data abort dump
+        .Data abort dump
     
-  -Data structure
+    -Data structure
   
-    .list
+        .list
     
-    .heap
+        .heap
     
     
  ToDo
  
-  -Verify vmalloc
+     -Verify vmalloc
   
-  -Refactory
+     -Refactory
   
-  -Supprot C lib functions
+     -Supprot C lib functions
   
-  -Add wifi
+     -Add wifi
   
-  -Integrate with lwip
+     -Integrate with lwip
   
-  -......
+     -......
   
   
   Goal
-  -Do something interesting
   
-  -Self Traning
+      -Do something interesting
+  
+      -Self Traning
   
