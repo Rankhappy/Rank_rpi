@@ -4,6 +4,7 @@ OBJ += print.o main.o
 OBJ += low_malloc.o frame.o slab.o
 OBJ += heap.o thread.o
 OBJ += irq.o timer.o sys_timer.o
+OBJ += vmalloc.o
 
 ELF = rank.elf
 BIN = rank.bin

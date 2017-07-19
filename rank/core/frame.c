@@ -9,6 +9,7 @@
 #include "mm.h"
 #include "mm_internal.h"
 #include "thread.h"
+#include "board.h"
 
 #define FRAME_MAX_ORDER 11
 
@@ -195,15 +196,15 @@ void _free_zone(zones_t *zones, zone_map_t *zone_map, frame_t *frame)
 }
 
 /*TODO: add other types of physical memory.*/
-int zones_init(addr_t start, size_t size)
+int zones_init(addr_t start)
 {
 	int rc;
 	zones_t *zones;
 	zone_map_t *zone_map;
+	size_t size = LINEAR_MEM_SIZE;
 
 	start = allign_up(start, FRAME_SHIFT);
 	size = allign_down(size, FRAME_SHIFT);
-
 	if(size == 0)
 	{
 		return -1;
@@ -223,6 +224,31 @@ int zones_init(addr_t start, size_t size)
 	}
 
 	mutex_init(&g_frame_lock);
+
+	/*We can use rmalloc now because the linear zone has initialized.*/
+	zones = (zones_t*)rmalloc(sizeof(zones_t));
+	if(zones == NULL)
+	{
+		return -1;
+	}
+	start += LINEAR_MEM_SIZE;
+	size = PHY_MEM_SIZE - start;
+	start = allign_up(start, FRAME_SHIFT);
+	size = allign_down(size, FRAME_SHIFT);
+	if(size == 0)
+	{
+		return -1;
+	}
+	zones->start_pfn = start>>FRAME_SHIFT;
+	zones->frames = size>>FRAME_SHIFT;
+	zone_map = (zone_map_t *)rmalloc(sizeof(zone_map_t)*(zones->frames));
+	if(zone_map == NULL)
+	{
+		return -1;
+	}
+
+	g_zones[TYPE_NORMAL_ZONE] = zones;
+	g_map[TYPE_NORMAL_ZONE] = zone_map;
 
 	return 0;
 }

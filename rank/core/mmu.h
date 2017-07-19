@@ -22,5 +22,6 @@ typedef struct
 typedef addr_t (*alloc_pt2_t)(int);
 
 extern int do_mmu_map(addr_t, addr_t, size_t, mmu_flag_t, alloc_pt2_t);
+extern void do_mmu_unmap(addr_t);
 
 #endif

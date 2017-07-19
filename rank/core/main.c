@@ -16,26 +16,8 @@
 #include "irq.h"
 #include "sys_timer.h"
 
-#define MEMORY_NOMAL(flag)\
-{ \
-	flag.cacheble = 1; \
-	flag.shareble = 1; \
-	flag.ap = 0; \
-	flag.ns = 0; \
-	flag.ng = 0; \
-}
-
-#define MEMORY_DEVICE(flag)\
-{ \
-	flag.cacheble = 0; \
-	flag.shareble = 0; \
-	flag.ap = 0; \
-	flag.ns = 0; \
-	flag.ng = 0; \
-}
-
 #define DECALRE_PT2_ARRAY(num) \
-	addr_t g_pt2_addr##num[1024] __attribute__((aligned(1024)));
+	addr_t g_pt2_addr##num[256] __attribute__((aligned(1024)));
 
 #define rdbg(fmt, args...) printf("[RANK][DEBUG]"fmt, ##args)
 #define rerr(fmt, args...) printf("[RANK][ERROR]"fmt, ##args)
@@ -331,7 +313,7 @@ int rank_main(void)
 	mm_start += low_area_size;
 	mm_start = allign_up(mm_start, PAGE_SHIFT);
 	rdbg("g_v2p_off= 0x%08x\n", g_v2p_off);
-	if(zones_init(vir2phy(mm_start, g_v2p_off), LINEAR_MEM_SIZE) == -1)
+	if(zones_init(vir2phy(mm_start, g_v2p_off)) == -1)
 	{
 		rdbg("zones init failed!\n");
 		return -1;

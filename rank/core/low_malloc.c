@@ -24,8 +24,6 @@ typedef struct
 }chunk_t;
 
 static list_t g_free_list[LOW_MAX_ORDER+1];
-static addr_t g_low_base;
-static size_t g_low_size;
 static mutex_t g_low_lock;
 
 int low_area_init(addr_t start, size_t size)
@@ -35,8 +33,6 @@ int low_area_init(addr_t start, size_t size)
 	
 	start = allign_up(start, LOW_SIZE_SHIFT);
 	size = allign_down(size, LOW_SIZE_SHIFT);
-	g_low_base = start;
-	g_low_size = size;
 
 	for(order = 0; order <= LOW_MAX_ORDER; order++)
 	{	
@@ -44,13 +40,13 @@ int low_area_init(addr_t start, size_t size)
 	}
 
 	/*Upper boundary.*/
-	chunk = (chunk_t *)g_low_base;
+	chunk = (chunk_t *)start;
 	chunk->size = 1<<LOW_SIZE_SHIFT;
 	chunk->flag = FLAG_ALLOC_BIT;
 
 	/*Main area.*/
 	chunk = (chunk_t *)((addr_t)chunk + chunk->size);
-	chunk->size = g_low_size - (2<<LOW_SIZE_SHIFT);
+	chunk->size = size - (2<<LOW_SIZE_SHIFT);
 	chunk->flag = 1<<LOW_SIZE_SHIFT;
 	order = size2order(chunk->size, LOW_MAX_ORDER, LOW_SIZE_SHIFT);
 	list_init(&chunk->node);
@@ -59,7 +55,7 @@ int low_area_init(addr_t start, size_t size)
 	/*Down boundary.*/
 	chunk = (chunk_t *)((addr_t)chunk + chunk->size);
 	chunk->size = 1<<LOW_SIZE_SHIFT;
-	chunk->flag = FLAG_ALLOC_BIT | (g_low_size - (2<<LOW_SIZE_SHIFT));
+	chunk->flag = FLAG_ALLOC_BIT | (size - (2<<LOW_SIZE_SHIFT));
 
 	mutex_init(&g_low_lock);
 

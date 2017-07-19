@@ -204,3 +204,40 @@ loop:
 	return ret;
 }
 
+void do_mmu_unmap(addr_t vaddr)
+{
+	uint32_t l1_offset;
+	uint32_t *pt1_entry;
+	
+	vaddr = allign_down(vaddr, PAGE_SHIFT);
+
+	l1_offset = vaddr >> SECTION_SHIFT;
+	pt1_entry = (uint32_t *)g_pt1_addr;
+	pt1_entry += l1_offset;
+
+	if(*pt1_entry & 0x02) //section map
+	{
+		*pt1_entry = 0;
+	}
+	else if(*pt1_entry & 0x01) //coarse map
+	{
+		uint32_t l2_offset = (vaddr >> PAGE_SHIFT)&0xff;;
+		uint32_t *pt2_entry = (uint32_t *)(*pt1_entry & 0x3ff);
+		pt2_entry += l2_offset;
+		if(*pt2_entry & 0x02)
+		{
+			*pt2_entry = 0;
+		}
+		else
+		{
+			merr("Can not unmap,invaild 2nd-level page table.\n");
+		}
+		/*Should free the pt2_entry here?*/
+	}
+	else
+	{
+		merr("Can not unmap,invaild 1st-level page table.\n");
+	}
+	
+}
+

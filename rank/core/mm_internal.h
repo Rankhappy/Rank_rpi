@@ -15,6 +15,7 @@
 #define allign_down(x, a) ((x)&(~((1<<(a))-1)))
 
 #define LINEAR_MEM_SIZE  0x2000000
+#define PHY_MEM_SIZE 	0x3e000000
 
 #define FRAME_SHIFT 12
 #define FRAME_MASK (~((1<<FRAME_SHIFT)-1))

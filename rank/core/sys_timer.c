@@ -10,7 +10,7 @@
 #include "assert.h"
 #include "board.h"
 
-#define TIMNE_MS (1000)
+#define TIME_MS (1000)
 
 typedef enum
 {
@@ -85,11 +85,11 @@ void sys_timer_add(timer_entity_t *te)
 	if(g_sys_timer.stat == STAT_IDLE)
 	{
 		g_sys_timer.base_counter = 0;
-		g_sys_timer.last_counter = get_timer_lcounter()/TIMNE_MS;
+		g_sys_timer.last_counter = get_timer_lcounter()/TIME_MS;
 		stmdbg("base_counter = 0x%08x, last_counter = 0x%08x.\n", \
 				g_sys_timer.base_counter, g_sys_timer.last_counter);
 		heap_insert(&g_sys_timer.h, &te->node, timer_timeout_comp);
-		set_sys_timer(te->timeout*TIMNE_MS);
+		set_sys_timer(te->timeout*TIME_MS);
 		g_sys_timer.stat = STAT_BUSY;
 		spin_unlock_irqrestore(&g_sys_timer.lock, flag);
 		enable_timer_irq(TIMER_CHANNEL1);
@@ -98,7 +98,7 @@ void sys_timer_add(timer_entity_t *te)
 
 	assert(g_sys_timer.stat == STAT_BUSY);
 
-	counter = get_timer_lcounter()/TIMNE_MS;
+	counter = get_timer_lcounter()/TIME_MS;
 	g_sys_timer.base_counter += counter - g_sys_timer.last_counter;
 	g_sys_timer.last_counter = counter;
 	te->timeout += g_sys_timer.base_counter;
@@ -107,7 +107,7 @@ void sys_timer_add(timer_entity_t *te)
 	heap_insert(&g_sys_timer.h, &te->node, timer_timeout_comp);
 	if(heap_get(&g_sys_timer.h) == &te->node)
 	{
-		set_sys_timer((te->timeout-g_sys_timer.base_counter)*TIMNE_MS);
+		set_sys_timer((te->timeout-g_sys_timer.base_counter)*TIME_MS);
 	}
 	
 	spin_unlock_irqrestore(&g_sys_timer.lock, flag);
@@ -127,7 +127,7 @@ static void sys_timer_timeout(void *arg)
 	n = heap_get(&g_sys_timer.h);
 	assert(n);
 	
-	counter = get_timer_lcounter()/TIMNE_MS;
+	counter = get_timer_lcounter()/TIME_MS;
 	g_sys_timer.base_counter += counter - g_sys_timer.last_counter;
 	g_sys_timer.last_counter = counter;
 	stmdbg("base_counter = 0x%08x, last_counter = 0x%08x.\n", \
@@ -149,11 +149,11 @@ static void sys_timer_timeout(void *arg)
 		next_te = heap_data(n, timer_entity_t, node);
 		if(next_te->timeout <= g_sys_timer.base_counter)
 		{
-			set_sys_timer(TIMNE_MS);
+			set_sys_timer(TIME_MS);
 		}
 		else
 		{
-			set_sys_timer((next_te->timeout-g_sys_timer.base_counter)*TIMNE_MS);
+			set_sys_timer((next_te->timeout-g_sys_timer.base_counter)*TIME_MS);
 		}
 	}
 
